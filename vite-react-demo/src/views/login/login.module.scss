@@ -1,0 +1,133 @@
+/* === 全局容器：渐变背景 === */
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #6a5acd, #7b68ee, #00bfff, #ff69b4);
+  background-size: 400% 400%;
+  animation: gradientFlow 12s ease infinite;
+  box-sizing: border-box;
+}
+
+/* 背景流动动画 */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* === 登录框 === */
+.box {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  transition: transform 0.3s ease;
+  box-sizing: border-box;
+
+  &:hover {
+    transform: translateY(-3px);
+  }
+}
+
+/* === 标题 === */
+.title {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* === 表单样式 === */
+.formGroup {
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+
+    &:focus {
+      border-color: #7b68ee;
+      outline: none;
+    }
+  }
+}
+
+/* === 登录按钮 === */
+.loginBtn {
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(to right, #7b68ee, #00bfff, #ff69b4);
+  background-size: 200% auto;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.4s;
+  box-sizing: border-box;
+
+  &:hover {
+    background-position: right center;
+    transform: scale(1.03);
+  }
+}
+
+/* === 页脚 === */
+.footer {
+  text-align: center;
+  color: #777;
+  font-size: 13px;
+  margin-top: 25px;
+}
+
+/* === 响应式优化 === */
+@media (max-width: 480px) {
+  .container {
+    padding: 10px;
+  }
+
+  .box {
+    padding: 24px 18px;
+    border-radius: 12px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .formGroup input {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .loginBtn {
+    font-size: 15px;
+    padding: 10px 0;
+  }
+}

@@ -1,0 +1,105 @@
+/* === 背景渐变 + 居中 === */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #ff6a6a, #ffb347, #6a5acd, #00bfff);
+  background-size: 400% 400%;
+  animation: gradientFlow 12s ease infinite;
+  box-sizing: border-box;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* === 404 提示框 === */
+.box {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 40px 30px;
+  border-radius: 20px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box;
+
+  &:hover {
+    transform: translateY(-2px);
+    transition: transform 0.3s ease;
+  }
+}
+
+/* === 404 大标题 === */
+.code {
+  font-size: 96px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+/* === 副标题 === */
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #555;
+  margin-top: 10px;
+}
+
+/* === 描述 === */
+.desc {
+  color: #777;
+  font-size: 14px;
+  margin-top: 10px;
+  margin-bottom: 30px;
+}
+
+/* === 返回按钮 === */
+.backBtn {
+  padding: 12px 0;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(to right, #7b68ee, #00bfff, #ff69b4);
+  background-size: 200% auto;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.4s;
+
+  &:hover {
+    background-position: right center;
+    transform: scale(1.03);
+  }
+}
+
+/* === 响应式 === */
+@media (max-width: 480px) {
+  .box {
+    padding: 30px 20px;
+    border-radius: 12px;
+  }
+
+  .code {
+    font-size: 64px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .desc {
+    font-size: 13px;
+  }
+
+  .backBtn {
+    font-size: 15px;
+    padding: 10px 0;
+  }
+}

@@ -6,6 +6,27 @@
     <title>Document</title>
   </head>
   <body>
+    <div id="app">
+      <div class="title">列表</div>
+      <div class="list">
+        <div class="item">
+          <p>1</p>
+          <span>abcdefg</span>
+        </div>
+        <div class="item">
+          <p>1</p>
+          <span>abcdefg</span>
+        </div>
+         <div class="item">
+          <p>1</p>
+          <span>abcdefg</span>
+        </div>
+         <div class="item">
+          <p>1</p>
+          <span>abcdefg</span>
+        </div>
+      </div>
+    </div>
     <script>
       function debounce(fn, delay) {
         let timer = null;
@@ -34,6 +55,15 @@
           console.log("scroll");
         }, 1000)
       );
+    </script>
+
+    <script>
+      let doms = document.getElementById("app").querySelectorAll("*");
+      doms.forEach(l=>{
+        console.log(l.tagName,);
+        
+      })
+      console.log(doms)
     </script>
   </body>
 </html>
