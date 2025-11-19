@@ -1,28 +1,17 @@
+import { Provider } from 'react-redux'
 import { RouterProvider } from 'react-router-dom'
 import router from '@/router'
-import { createContext } from 'react'
+import store from './store'
 
-
-
-export const UserContext = createContext({
-  name: '',
-  age: 0,
-  sex: 1,
-})
 
 
 function App() {
 
 
   return (
-    // context
-    <UserContext.Provider value={{
-      name: ' 宋金涛',
-      age: 18,
-      sex: 1,
-    }}>
+    <Provider store={store}>
       <RouterProvider router={router} />
-    </UserContext.Provider>
+    </Provider>
   )
 }
 

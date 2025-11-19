@@ -1,0 +1,180 @@
+// TodoList.module.scss
+
+// --- 变量定义 ---
+$primary-color: #6366f1;
+$primary-hover: #4f46e5;
+$danger-color: #ef4444;
+$text-main: #1f2937;
+$text-secondary: #6b7280;
+$bg-page: #f3f4f6;
+$bg-card: #ffffff;
+$border-color: #e5e7eb;
+
+.appContainer {
+  min-height: 100vh;
+  background-color: $bg-page;
+  display: flex;
+  justify-content: center;
+  padding-top: 3rem;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.card {
+  background: $bg-card;
+  width: 100%;
+  max-width: 700px;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+
+  .title {
+    font-size: 1.8rem;
+    color: $text-main;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-weight: 700;
+  }
+}
+
+.inputGroup {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+
+  .input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid $border-color;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+    outline: none;
+
+    &:focus {
+      border-color: $primary-color;
+    }
+  }
+}
+
+// 基础按钮样式
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+
+  &:active { transform: scale(0.98); }
+}
+
+// 按钮变体
+.btnPrimary {
+  @extend .btn; // 继承基础样式
+  background-color: $primary-color;
+  color: white;
+  &:hover { background-color: $primary-hover; }
+}
+
+.btnOutline {
+  @extend .btn;
+  background-color: transparent;
+  border: 1px solid $border-color;
+  color: $text-main;
+  &:hover { background-color: #f9fafb; }
+}
+
+.btnDanger {
+  @extend .btn;
+  background-color: #fee2e2;
+  color: $danger-color;
+  &:hover { 
+    background-color: $danger-color;
+    color: white;
+  }
+}
+
+.stats {
+  margin-bottom: 1rem;
+  color: $text-secondary;
+  font-size: 0.9rem;
+  span {
+    font-weight: bold;
+    color: $text-main;
+  }
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid $border-color;
+  transition: background-color 0.2s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background-color: #f9fafb; }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .itemTitle {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: $text-main;
+  }
+
+  .itemTime {
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
+// 完成状态 (用于条件渲染)
+.completed {
+  .itemTitle {
+    text-decoration: line-through;
+    color: $text-secondary;
+  }
+  opacity: 0.8;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 8px;
+
+  &.pending {
+    background-color: #fef3c7;
+    color: #d97706;
+  }
+  &.done {
+    background-color: #d1fae5;
+    color: #059669;
+  }
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem;
+  color: $text-secondary;
+  font-style: italic;
+}

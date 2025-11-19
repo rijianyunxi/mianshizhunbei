@@ -1,8 +1,7 @@
-import { useEffect,useContext } from "react";
+import { useEffect } from "react";
 import  type { FormEvent, ChangeEvent } from "react";
 import   { useState } from "react";
 import styles from "./login.module.scss";
-// import { UserContext } from '@/App';
 
 
 interface FormState {
@@ -11,7 +10,6 @@ interface FormState {
 }
 
 export default function LoginPage() {
-  // const context = useContext(UserContext);
   
   const [form, setForm] = useState<FormState>({ username: "", password: "" });
 
