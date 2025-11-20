@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易工作流设计器 (Canvas版)</title>
+    <!-- 引入 Font Awesome 样式用于节点图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        /* 1. 调整主要颜色和面板宽度 */
+        :root {
+            --primary-color: #409eff; /* 现代化蓝色 */
+            --bg-color: #f0f2f5;
+            --panel-width: 240px; /* 属性面板宽度调整为 240px */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh; /* 确保占满视口高度 */
+        }
+
+        /* 左侧工具栏 */
+        .toolbar {
+            width: 60px;
+            background: #fff;
+            border-right: 1px solid #e0e0e0; /* 边框更柔和 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 10;
+        }
+
+        .tool-item {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 15px;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px; /* 增加圆角 */
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px; /* 增大图标尺寸 */
+            background: #fff;
+            transition: all 0.3s;
+            user-select: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* 轻微阴影 */
+        }
+
+        .tool-item:hover {
+            border-color: var(--primary-color);
+            background-color: #ecf5ff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* 中间画布区域 */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: var(--bg-color); /* 纯色背景 */
+            overflow: hidden;
+            /* 鼠标在画布空白处显示为拖动图标 */
+            cursor: grab; 
+        }
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+
+        canvas {
+            display: block;
+            /* 覆盖默认的抓手图标，确保拖动节点时恢复默认光标 */
+            cursor: default !important;
+        }
+
+        /* 右侧属性面板 */
+        .properties-panel {
+            width: var(--panel-width);
+            background: #fff;
+            border-left: 1px solid #e0e0e0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .panel-header {
+            font-size: 18px; /* 增大标题 */
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 9px 12px; /* 增大内边距 */
+            border: 1px solid #dcdfe6;
+            border-radius: 6px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        .form-group textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 6px;
+            box-sizing: border-box;
+            resize: vertical;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-group textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            color: #fff;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:active { transform: translateY(1px); }
+
+        .btn-primary { background-color: var(--primary-color); }
+        .btn-danger { background-color: #f56c6c; }
+        .btn-success { background-color: #67c23a; }
+        .btn-secondary { background-color: #909399; }
+
+        /* 2. 调整操作栏位置以适应新的面板宽度 */
+        .action-bar {
+            position: absolute;
+            top: 15px;
+            right: 260px; /* 240px (Panel) + 20px (Padding) */
+            z-index: 5;
+        }
+        
+        .empty-state {
+            color: #a0a0a0;
+            font-style: italic;
+            text-align: center;
+            padding: 40px 0;
+            border: 1px dashed #e0e0e0;
+            border-radius: 6px;
+        }
+
+        /* 提示 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 4px;
+            display: none;
+            z-index: 100;
+            font-size: 14px;
+        }
+        
+        /* 节点图标样式 */
+        .node-icon {
+            font-size: 1.5em; /* 增大图标尺寸 */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <div class="tool-item" onclick="app.addNode('start')" title="开始节点 (▶️)">
+            <i class="fas fa-play" style="color:#67c23a;"></i>
+        </div>
+        <div class="tool-item" onclick="app.addNode('task')" title="任务节点">
+            <i class="fas fa-tasks" style="color:#409eff;"></i>
+        </div>
+        <div class="tool-item" onclick="app.addNode('end')" title="结束节点 (🛑)">
+            <i class="fas fa-stop" style="color:#f56c6c;"></i>
+        </div>
+        <div class="tool-item" id="linkModeBtn" onclick="app.toggleLinkMode()" title="连线模式 (L)">
+            <i class="fas fa-link"></i>
+        </div>
+    </div>
+
+    <!-- 画布 -->
+    <div class="canvas-container" id="canvasContainer">
+        <div class="action-bar">
+            <button class="btn btn-success" onclick="app.saveData()">保存/导出数据 & 校验</button>
+            <button class="btn btn-secondary" onclick="app.loadDemoData()">回显Demo数据</button>
+            <button class="btn btn-danger" onclick="app.clear()">清空</button>
+        </div>
+        <canvas id="workflowCanvas"></canvas>
+    </div>
+
+    <!-- 属性面板 -->
+    <div class="properties-panel" id="propertiesPanel">
+        <div class="panel-header">属性配置</div>
+        <div id="propContent">
+            <div class="empty-state">请点击选择节点或连线</div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">提示信息</div>
+
+<script>
+/**
+ * 简易工作流设计器核心逻辑
+ */
+class WorkflowDesigner {
+    constructor(canvasId, containerId) {
+        this.canvas = document.getElementById(canvasId);
+        this.container = document.getElementById(containerId);
+        this.ctx = this.canvas.getContext('2d');
+        
+        // 数据模型
+        this.nodes = [];
+        this.edges = [];
+        
+        // 状态管理
+        this.isDragging = false;
+        this.dragTarget = null; // Either a node or { isCanvas: true }
+        this.selectedElement = null; // Node or Edge
+        this.isLinkMode = false;
+        this.tempLine = null;
+        this.linkingSource = null;
+
+        // 配置 (包含缩放和平移状态)
+        this.config = {
+            nodeWidth: 140, 
+            nodeHeight: 60,
+            radius: 30, 
+            gridSize: 20,
+            scale: 1, // 缩放比例
+            panX: 0,  // 平移X
+            panY: 0   // 平移Y
+        };
+
+        this.init();
+    }
+
+    init() {
+        // 响应式画布大小 & 高分屏DPI修复
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+
+        // 绑定事件
+        this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+        this.canvas.addEventListener('wheel', this.handleWheel.bind(this)); // 滚轮缩放
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') this.deleteSelected();
+            }
+            if (e.key.toLowerCase() === 'l') this.toggleLinkMode();
+        });
+
+        this.render();
+    }
+
+    // ==================== 缩放和平移核心逻辑 ====================
+
+    // 修复高分屏模糊问题，并设置显示尺寸
+    setCanvasScale() {
+        const dpr = window.devicePixelRatio || 1;
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+
+        // 设置绘图缓冲区大小（乘以DPR）
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+
+        // 设置显示大小（CSS大小）
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+
+        // 缩放绘图上下文，保证所有绘制指令都适配DPR
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); 
+    }
+
+    resizeCanvas() {
+        this.setCanvasScale();
+        this.render();
+    }
+    
+    // 将屏幕坐标转换为画布（世界）坐标
+    getCanvasCoords(screenX, screenY) {
+        const realX = (screenX - this.config.panX) / this.config.scale;
+        const realY = (screenY - this.config.panY) / this.config.scale;
+        return { realX, realY };
+    }
+
+    handleWheel(e) {
+        e.preventDefault();
+        const scaleFactor = 1.1;
+        const delta = e.deltaY > 0 ? 1 / scaleFactor : scaleFactor;
+        
+        // 缩放相对于鼠标位置
+        const mouseX = e.offsetX;
+        const mouseY = e.offsetY;
+
+        const oldScale = this.config.scale;
+        let newScale = oldScale * delta;
+        
+        // 限制缩放范围
+        newScale = Math.min(2.0, Math.max(0.3, newScale));
+        if (newScale === oldScale) return;
+
+        // 计算平移调整，以实现以光标为中心的缩放
+        this.config.panX = mouseX - (mouseX - this.config.panX) * (newScale / oldScale);
+        this.config.panY = mouseY - (mouseY - this.config.panY) * (newScale / oldScale);
+        this.config.scale = newScale;
+
+        this.render();
+    }
+
+    // ==================== 数据操作 ====================
+
+    // 生成UUID
+    generateId() {
+        return 'node_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 添加节点
+    addNode(type) {
+        // 默认位置在画布中心，需要转换到世界坐标
+        const centerX = this.canvas.width / (window.devicePixelRatio || 1) / 2;
+        const centerY = this.canvas.height / (window.devicePixelRatio || 1) / 2;
+        const { realX: x, realY: y } = this.getCanvasCoords(centerX, centerY);
+
+        const newNode = {
+            id: this.generateId(),
+            type: type, // 'start', 'task', 'end'
+            x: x + (Math.random() * 40 - 20) / this.config.scale,
+            y: y + (Math.random() * 40 - 20) / this.config.scale,
+            label: type === 'task' ? '新任务节点，可拖动修改名称' : '', // 开始/结束节点不再显示文字
+            // 业务属性
+            props: {
+                personnel: '', // 经办人
+                isCompleted: type === 'task' ? '未完成' : 'N/A', // 新增任务完成状态
+                description: ''
+            }
+        };
+        this.nodes.push(newNode);
+        this.selectElement(newNode);
+        this.render();
+        this.showToast('已添加节点');
+    }
+
+    // 添加连线
+    addEdge(sourceId, targetId) {
+        // 检查是否已存在
+        const exist = this.edges.find(e => e.source === sourceId && e.target === targetId);
+        if (exist) {
+            this.showToast('连线已存在');
+            return;
+        }
+        
+        // 不允许自指
+        if (sourceId === targetId) {
+            this.showToast('不能自连');
+            return;
+        }
+
+        const sourceNode = this.nodes.find(n => n.id === sourceId);
+        const targetNode = this.nodes.find(n => n.id === targetId);
+        
+        // 强化连线规则: 
+        // 1. 不允许从结束节点连出
+        if (sourceNode.type === 'end') {
+            this.showToast('不允许从 "结束节点" 连出');
+            return;
+        }
+        // 2. 不允许连向开始节点
+        if (targetNode.type === 'start') {
+            this.showToast('不允许连向 "开始节点"');
+            return;
+        }
+        // 3. 不允许开始节点连向开始节点 (已包含在规则2中，但明确列出)
+        if (sourceNode.type === 'start' && targetNode.type === 'start') {
+             this.showToast('不允许开始节点之间连线');
+             return;
+        }
+        
+        const newEdge = {
+            id: 'edge_' + Math.random().toString(36).substr(2, 9),
+            source: sourceId,
+            target: targetId,
+            label: ''
+        };
+        this.edges.push(newEdge);
+        this.selectElement(newEdge);
+        this.render();
+    }
+
+    // 删除选中项
+    deleteSelected() {
+        if (!this.selectedElement) {
+            this.showToast('请先选中一个元素');
+            return;
+        }
+
+        if (confirm('确定删除选中元素吗？')) { 
+            if (this.selectedElement.source) {
+                // 删除线
+                this.edges = this.edges.filter(e => e.id !== this.selectedElement.id);
+                this.showToast('已删除连线');
+            } else {
+                // 删除节点，同时删除关联的线
+                const nodeId = this.selectedElement.id;
+                this.nodes = this.nodes.filter(n => n.id !== nodeId);
+                this.edges = this.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+                this.showToast('已删除节点');
+            }
+            
+            this.selectedElement = null;
+            this.updatePropPanel();
+            this.render();
+        }
+    }
+
+    updateNodeData(id, key, value) {
+        const node = this.nodes.find(n => n.id === id);
+        if (node) {
+            if (key === 'label') node.label = value;
+            else if (key === 'isCompleted') node.props.isCompleted = value;
+            else node.props[key] = value;
+            this.render();
+        }
+    }
+
+    // ==================== 渲染逻辑 ====================
+
+    render() {
+        const dpr = window.devicePixelRatio || 1;
+        // 1. 清空画布 (使用DPR修复后的全尺寸)
+        this.ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+
+        // 2. 应用平移和缩放
+        this.ctx.save();
+        this.ctx.translate(this.config.panX, this.config.panY);
+        this.ctx.scale(this.config.scale, this.config.scale);
+        
+        // 3. 绘制背景网格
+        this.drawGrid();
+
+        // 4. 绘制连线
+        this.edges.forEach(edge => {
+            const sourceNode = this.nodes.find(n => n.id === edge.source);
+            const targetNode = this.nodes.find(n => n.id === edge.target);
+            if (sourceNode && targetNode) {
+                this.drawEdge(sourceNode, targetNode, edge === this.selectedElement);
+            }
+        });
+
+        // 5. 绘制临时连线
+        if (this.isLinkMode && this.linkingSource && this.tempLine) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.linkingSource.x, this.linkingSource.y);
+            this.ctx.lineTo(this.tempLine.x, this.tempLine.y);
+            this.ctx.strokeStyle = '#999';
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.lineWidth = 2 / this.config.scale; 
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+        }
+
+        // 6. 绘制节点
+        this.nodes.forEach(node => {
+            this.drawNode(node, node === this.selectedElement);
+        });
+
+        // 7. 恢复画布状态
+        this.ctx.restore();
+    }
+    
+    drawGrid() {
+        // ... (Grid drawing logic remains the same) ...
+        const ctx = this.ctx;
+        const size = this.config.gridSize;
+        const { width, height } = this.canvas.style; // 获取CSS尺寸
+        const w = parseFloat(width) / this.config.scale;
+        const h = parseFloat(height) / this.config.scale;
+        
+        // 计算平移后的网格起点
+        const startX = (-this.config.panX / this.config.scale) % size;
+        const startY = (-this.config.panY / this.config.scale) % size;
+
+        ctx.strokeStyle = 'rgba(221, 221, 221, 0.6)';
+        ctx.lineWidth = 1 / this.config.scale; 
+
+        ctx.beginPath();
+        // 绘制垂直线
+        for (let x = startX; x < w; x += size) {
+            ctx.moveTo(x, -this.config.panY / this.config.scale);
+            ctx.lineTo(x, h - this.config.panY / this.config.scale);
+        }
+        // 绘制水平线
+        for (let y = startY; y < h; y += size) {
+            ctx.moveTo(-this.config.panX / this.config.scale, y);
+            ctx.lineTo(w - this.config.panX / this.config.scale, y);
+        }
+        ctx.stroke();
+    }
+    
+    // 文本自动换行函数 (保持不变)
+    wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(''); 
+        let line = '';
+        let lines = [];
+
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n];
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+
+            if (testWidth > maxWidth && n > 0) {
+                lines.push(line);
+                line = words[n];
+            } else {
+                line = testLine;
+            }
+        }
+        lines.push(line);
+
+        if (lines.length > 2) {
+             lines = lines.slice(0, 2);
+             let lastLine = lines[1];
+             while(ctx.measureText(lastLine + '...').width > maxWidth && lastLine.length > 1) {
+                 lastLine = lastLine.substring(0, lastLine.length - 1);
+             }
+             lines[1] = lastLine + '...';
+        }
+        
+        const totalHeight = lines.length * lineHeight;
+        const startY = y - totalHeight / 2 + lineHeight / 2;
+        
+        lines.forEach((l, index) => {
+            ctx.fillText(l, x, startY + index * lineHeight);
+        });
+    }
+
+
+    // 现代化节点绘制
+    drawNode(node, isSelected) {
+        const ctx = this.ctx;
+        const { x, y, type, label } = node;
+        const w = this.config.nodeWidth;
+        const h = this.config.nodeHeight;
+        const r = this.config.radius;
+
+        ctx.beginPath();
+        
+        // 样式设置
+        ctx.lineWidth = 1.5 / this.config.scale; 
+        ctx.strokeStyle = isSelected ? '#409eff' : (type === 'start' ? '#52c41a' : (type === 'end' ? '#f5222d' : '#dcdfe6'));
+        ctx.shadowBlur = isSelected ? 15 : 5; 
+        ctx.shadowColor = isSelected ? 'rgba(64, 158, 255, 0.5)' : 'rgba(0,0,0,0.1)';
+        
+        ctx.fillStyle = '#ffffff'; 
+
+        if (type === 'start' || type === 'end') {
+            // 圆形节点
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = type === 'start' ? '#f0fff0' : '#fff0f0'; 
+            
+            // 绘制内部边框，模仿双重圆圈
+            ctx.save();
+            ctx.fillStyle = type === 'start' ? '#52c41a' : '#f5222d'; 
+            ctx.shadowBlur = 0; // 内部不应有阴影
+            ctx.arc(x, y, r * 0.9, 0, Math.PI * 2); 
+            ctx.fill(); 
+            ctx.restore();
+            
+            // 绘制图标
+            ctx.fillStyle = '#ffffff'; 
+            ctx.font = `bold ${20 / this.config.scale}px "Font Awesome 6 Free"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (type === 'start') {
+                ctx.fillText('\uf04b', x, y); // fa-play
+            } else if (type === 'end') {
+                ctx.fillText('\uf04d', x, y); // fa-stop
+            }
+
+
+        } else {
+            // 矩形任务节点 (更圆润)
+            const cornerRadius = 12;
+            ctx.roundRect(x - w/2, y - h/2, w, h, cornerRadius);
+            
+            // 绘制任务完成状态指示
+            if (node.props.isCompleted === '已完成') {
+                 ctx.fillStyle = '#e8f0e8'; // 浅绿背景
+            }
+        }
+
+        ctx.fill();
+        ctx.stroke();
+
+        // 重置阴影
+        ctx.shadowBlur = 0;
+        ctx.textBaseline = 'alphabetic'; // 恢复默认基线
+
+        // 绘制文字 (任务节点)
+        if (type === 'task') {
+            ctx.fillStyle = '#333';
+            ctx.font = `${14 / this.config.scale}px Arial`; 
+            ctx.textAlign = 'center';
+            
+            const maxTextWidth = w - 20;
+            this.wrapText(ctx, label, x, y - 5 / this.config.scale, maxTextWidth, 18 / this.config.scale);
+
+            // 经办人小字 
+            if (node.props.personnel) {
+                ctx.font = `${11 / this.config.scale}px Arial`;
+                ctx.fillStyle = '#888';
+                ctx.textBaseline = 'top'; 
+                
+                const personnelText = node.props.personnel.split('\n')[0]; // 只显示第一行
+                ctx.fillText(`👤 ${personnelText}`, x, y + h / 2 + 5 / this.config.scale);
+            }
+        }
+    }
+
+    drawEdge(source, target, isSelected) {
+        const ctx = this.ctx;
+
+        // 核心：计算连线与节点边界的精确交点
+        const intersection = this.getIntersectionPoint(source, target);
+        
+        let startX = intersection.start.x;
+        let startY = intersection.start.y;
+        let endX = intersection.end.x;
+        let endY = intersection.end.y;
+        
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        
+        ctx.strokeStyle = isSelected ? '#409eff' : '#999';
+        ctx.lineWidth = 2 / this.config.scale; 
+        ctx.stroke();
+
+        // 绘制箭头
+        this.drawArrow(ctx, startX, startY, endX, endY);
+    }
+    
+    // 获取线段与节点边界的精确交点
+    getIntersectionPoint(source, target) {
+        // 圆心/矩形中心
+        const p1 = { x: source.x, y: source.y };
+        const p2 = { x: target.x, y: target.y };
+
+        const start = this.getBoundaryPoint(source, p2);
+        const end = this.getBoundaryPoint(target, p1);
+
+        return { start, end };
+    }
+
+    // 根据节点类型和目标点，计算节点边界上的点
+    getBoundaryPoint(node, targetPoint) {
+        const cx = node.x;
+        const cy = node.y;
+        const dx = targetPoint.x - cx;
+        const dy = targetPoint.y - cy;
+        const angle = Math.atan2(dy, dx);
+        
+        if (node.type === 'start' || node.type === 'end') {
+            // 圆形节点
+            const r = this.config.radius;
+            return {
+                x: cx + r * Math.cos(angle),
+                y: cy + r * Math.sin(angle)
+            };
+        } else {
+            // 矩形节点
+            const w = this.config.nodeWidth;
+            const h = this.config.nodeHeight;
+            let finalX, finalY;
+            
+            // 计算直线与矩形四条边的交点
+            // t = (w/2) / |cos(angle)| 或 t = (h/2) / |sin(angle)|
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            
+            let t = Infinity;
+
+            if (Math.abs(cosA) > 1e-6) {
+                t = Math.min(t, Math.abs((w / 2) / cosA));
+            }
+            if (Math.abs(sinA) > 1e-6) {
+                t = Math.min(t, Math.abs((h / 2) / sinA));
+            }
+            
+            finalX = cx + t * cosA;
+            finalY = cy + t * sinA;
+            
+            return { x: finalX, y: finalY };
+        }
+    }
+
+
+    drawArrow(ctx, x1, y1, x2, y2) {
+        const headLength = 10 / this.config.scale; 
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        
+        // 箭头画在终点 (x2, y2) 处
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+        ctx.stroke();
+    }
+
+    // ==================== 交互逻辑 ====================
+    
+    // 连线碰撞检测 (保持不变)
+    getEdgeAt(x, y) {
+        const distToSegmentSquared = (p, a, b) => {
+            const l2 = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
+            if (l2 === 0) return (p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y);
+            let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const projX = a.x + t * (b.x - a.x);
+            const projY = a.y + t * (b.y - a.y);
+            return (p.x - projX) * (p.x - projX) + (p.y - projY) * (p.y - projY);
+        };
+        
+        for (const edge of this.edges) {
+            const source = this.nodes.find(n => n.id === edge.source);
+            const target = this.nodes.find(n => n.id === edge.target);
+            if (!source || !target) continue;
+
+            // 使用精确边界点进行检测
+            const intersection = this.getIntersectionPoint(source, target);
+            const distSq = distToSegmentSquared({ x, y }, intersection.start, intersection.end);
+
+            if (distSq < 100 / (this.config.scale * this.config.scale)) { 
+                return edge;
+            }
+        }
+        return null;
+    }
+
+
+    handleMouseDown(e) {
+        const { offsetX, offsetY } = e;
+        const { realX, realY } = this.getCanvasCoords(offsetX, offsetY);
+        
+        const clickedNode = this.getNodeAt(realX, realY);
+        const clickedEdge = !clickedNode ? this.getEdgeAt(realX, realY) : null;
+        
+        
+        if (this.isLinkMode) {
+            if (clickedNode) {
+                // 连线模式下，检查是否可以作为起点
+                if (clickedNode.type === 'end') {
+                    this.showToast('不允许从 "结束节点" 连出');
+                    this.selectElement(clickedNode);
+                    return;
+                }
+                this.linkingSource = clickedNode;
+                this.selectElement(clickedNode);
+            } else {
+                this.selectElement(null);
+            }
+        } else {
+            if (clickedNode) {
+                this.isDragging = true;
+                this.dragTarget = clickedNode;
+                this.selectElement(clickedNode);
+            } else if (clickedEdge) {
+                this.selectElement(clickedEdge);
+                this.isDragging = false; 
+                
+            } else {
+                this.isDragging = true;
+                this.dragTarget = { isCanvas: true, lastX: offsetX, lastY: offsetY };
+                this.selectElement(null);
+            }
+        }
+        this.render();
+    }
+
+    handleMouseMove(e) {
+        const { offsetX, offsetY } = e;
+        const { realX, realY } = this.getCanvasCoords(offsetX, offsetY);
+
+        if (this.isLinkMode && this.linkingSource) {
+            this.tempLine = { x: realX, y: realY };
+            this.render();
+        } else if (this.isDragging) {
+            if (this.dragTarget.isCanvas) {
+                // 画布平移
+                this.config.panX += offsetX - this.dragTarget.lastX;
+                this.config.panY += offsetY - this.dragTarget.lastY;
+                this.dragTarget.lastX = offsetX;
+                this.dragTarget.lastY = offsetY;
+                this.render();
+            } else if (this.dragTarget) {
+                // 节点拖动：计算世界坐标下的新位置
+                this.dragTarget.x = (offsetX - this.config.panX) / this.config.scale;
+                this.dragTarget.y = (offsetY - this.config.panY) / this.config.scale;
+                this.render();
+            }
+        }
+    }
+
+    handleMouseUp(e) {
+        const { offsetX, offsetY } = e;
+        const { realX, realY } = this.getCanvasCoords(offsetX, offsetY);
+
+        if (this.isLinkMode && this.linkingSource) {
+            const targetNode = this.getNodeAt(realX, realY);
+            if (targetNode && targetNode.id !== this.linkingSource.id) {
+                this.addEdge(this.linkingSource.id, targetNode.id);
+            }
+            
+            this.linkingSource = null;
+            this.tempLine = null;
+            this.isLinkMode = false;
+            document.getElementById('linkModeBtn').style.background = '#fff';
+            document.getElementById('linkModeBtn').style.borderColor = '#f0f0f0';
+            this.render();
+        }
+        
+        this.isDragging = false;
+        this.dragTarget = null;
+    }
+
+    getNodeAt(x, y) {
+        for (let i = this.nodes.length - 1; i >= 0; i--) {
+            const n = this.nodes[i];
+            const w = this.config.nodeWidth;
+            const h = this.config.nodeHeight;
+
+            if (n.type === 'start' || n.type === 'end') {
+                // 圆形碰撞检测
+                const dx = x - n.x;
+                const dy = y - n.y;
+                if (dx*dx + dy*dy <= this.config.radius * this.config.radius) return n;
+            } else {
+                // 矩形碰撞检测
+                if (x >= n.x - w/2 && x <= n.x + w/2 &&
+                    y >= n.y - h/2 && y <= n.y + h/2) return n;
+            }
+        }
+        return null;
+    }
+
+    selectElement(el) {
+        this.selectedElement = el;
+        this.updatePropPanel();
+    }
+
+    toggleLinkMode() {
+        this.isLinkMode = !this.isLinkMode;
+        const btn = document.getElementById('linkModeBtn');
+        if (this.isLinkMode) {
+             btn.style.background = '#ecf5ff';
+             btn.style.borderColor = '#409eff';
+        } else {
+             btn.style.background = '#fff';
+             btn.style.borderColor = '#f0f0f0';
+        }
+        this.showToast(this.isLinkMode ? '进入连线模式：点击并拖拽连接' : '退出连线模式');
+    }
+
+    // ==================== UI 更新 (属性面板) ====================
+
+    updatePropPanel() {
+        const panel = document.getElementById('propContent');
+        if (!this.selectedElement) {
+            panel.innerHTML = '<div class="empty-state">请点击选择节点或连线</div>';
+            return;
+        }
+
+        // 如果选中的是连线
+        if (this.selectedElement.source) {
+            const edge = this.selectedElement;
+            const sourceNode = this.nodes.find(n => n.id === edge.source);
+            const targetNode = this.nodes.find(n => n.id === edge.target);
+            panel.innerHTML = `
+                <div class="form-group">
+                    <label>连线 ID (不可修改)</label>
+                    <input type="text" value="${edge.id}" disabled style="background:#f5f5f5">
+                </div>
+                <div class="form-group">
+                    <label>起点: ${sourceNode ? sourceNode.label || sourceNode.type : '未知'}</label>
+                    <input type="text" value="${edge.source}" disabled style="background:#f5f5f5">
+                </div>
+                <div class="form-group">
+                    <label>终点: ${targetNode ? targetNode.label || targetNode.type : '未知'}</label>
+                    <input type="text" value="${edge.target}" disabled style="background:#f5f5f5">
+                </div>
+                <div style="margin-top:25px; border-top:1px solid #eee; padding-top:25px;">
+                     <button class="btn btn-danger" style="width:100%" onclick="app.deleteSelected()">删除当前连线</button>
+                </div>
+            `;
+            return;
+        }
+
+
+        // 如果选中的是节点
+        if (this.selectedElement.x !== undefined) {
+            const node = this.selectedElement;
+            panel.innerHTML = `
+                <div class="form-group">
+                    <label>ID (不可修改)</label>
+                    <input type="text" value="${node.id}" disabled style="background:#f5f5f5">
+                </div>
+                <div class="form-group">
+                    <label>节点类型</label>
+                    <input type="text" value="${node.type === 'start' ? '流程开始' : (node.type === 'end' ? '流程结束' : '任务审批')}" disabled style="background:#f5f5f5">
+                </div>
+                ${node.type === 'task' ? `
+                <div class="form-group">
+                    <label>节点名称</label>
+                    <input type="text" id="inputLabel" value="${node.label}" oninput="app.updateNodeData('${node.id}', 'label', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>经办人员/角色 (每行一个)</label>
+                    <textarea 
+                        rows="3" 
+                        oninput="app.updateNodeData('${node.id}', 'personnel', this.value)"
+                    >${node.props.personnel}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>任务完成状态</label>
+                    <select onchange="app.updateNodeData('${node.id}', 'isCompleted', this.value)">
+                        <option value="未完成" ${node.props.isCompleted === '未完成' ? 'selected' : ''}>未完成 (默认)</option>
+                        <option value="已完成" ${node.props.isCompleted === '已完成' ? 'selected' : ''}>已完成</option>
+                    </select>
+                </div>
+                ` : ''}
+                <div style="margin-top:25px; border-top:1px solid #eee; padding-top:25px;">
+                     <button class="btn btn-danger" style="width:100%" onclick="app.deleteSelected()">删除当前节点</button>
+                </div>
+            `;
+        }
+    }
+
+    showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 2000);
+    }
+
+    // ==================== 导入导出 & 校验 ====================
+
+    validateWorkflow() {
+        let isValid = true;
+        const taskNodes = this.nodes.filter(n => n.type === 'task');
+        
+        console.group('工作流校验结果');
+        
+        // 1. 检查任务节点名称是否为空
+        taskNodes.forEach(node => {
+            if (!node.label || node.label.trim() === '') {
+                console.warn(`[WARN] 任务节点ID: ${node.id} 缺少名称.`);
+                isValid = false;
+            }
+        });
+        
+        // 2. 检查是否有且仅有一个起始节点
+        const startNodes = this.nodes.filter(n => n.type === 'start');
+        if (startNodes.length !== 1) {
+             console.error(`[ERROR] 必须有且仅有一个 '开始' 节点。当前数量: ${startNodes.length}`);
+             isValid = false;
+        }
+
+        // 3. 检查是否有至少一个结束节点
+        const endNodes = this.nodes.filter(n => n.type === 'end');
+        if (endNodes.length === 0) {
+            console.error(`[ERROR] 流程必须有至少一个 '结束' 节点。`);
+            isValid = false;
+        }
+
+        console.log(`校验状态: ${isValid ? '通过' : '未通过'}`);
+        console.groupEnd();
+        
+        return isValid;
+    }
+
+    saveData() {
+        const isValid = this.validateWorkflow();
+        
+        const data = {
+            nodes: this.nodes,
+            edges: this.edges,
+            validation: isValid ? 'PASS' : 'FAIL'
+        };
+        const json = JSON.stringify(data, null, 2);
+        console.log('Submission Data:', json);
+        
+        alert(`工作流数据已生成。\n校验结果: ${isValid ? '通过 ✅' : '未通过 ❌'}\n请查看控制台输出或复制下方JSON.`);
+        return data;
+    }
+
+    clear() {
+        if (confirm('确定清空画布吗？此操作不可撤销。')) {
+            this.nodes = [];
+            this.edges = [];
+            this.selectElement(null);
+            this.render();
+            this.showToast('画布已清空');
+        }
+    }
+
+    loadDemoData() {
+        const demoData = {
+            "nodes": [
+                {"id": "n1", "type": "start", "x": 120, "y": 250, "label": "", "props": {"personnel": "", "isCompleted": "N/A"}},
+                {"id": "n2", "type": "task", "x": 380, "y": 250, "label": "部门经理审批", "props": {"personnel": "小王 (经办)\n李华 (备选)", "isCompleted": "未完成"}},
+                {"id": "n3", "type": "task", "x": 640, "y": 250, "label": "CEO 最终批准", "props": {"personnel": "李总 (角色)", "isCompleted": "已完成"}},
+                {"id": "n4", "type": "task", "x": 900, "y": 250, "label": "财务备案", "props": {"personnel": "赵财务", "isCompleted": "未完成"}},
+                {"id": "n5", "type": "end", "x": 1100, "y": 250, "label": "", "props": {"personnel": "", "isCompleted": "N/A"}}
+            ],
+            "edges": [
+                {"id": "e1", "source": "n1", "target": "n2", "label": ""},
+                {"id": "e2", "source": "n2", "target": "n3", "label": ""},
+                {"id": "e3", "source": "n3", "target": "n4", "label": ""},
+                {"id": "e4", "source": "n4", "target": "n5", "label": ""}
+            ]
+        };
+
+        this.nodes = demoData.nodes;
+        this.edges = demoData.edges;
+        this.selectedElement = null;
+        this.updatePropPanel();
+        this.render();
+        this.showToast('Demo数据已加载');
+    }
+}
+
+// Polyfill for roundRect
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+    };
+}
+
+// 初始化应用
+const app = new WorkflowDesigner('workflowCanvas', 'canvasContainer');
+
+</script>
+</body>
+</html>
