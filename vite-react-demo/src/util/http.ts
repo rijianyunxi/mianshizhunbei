@@ -18,7 +18,6 @@ instance.interceptors.request.use(
 
 instance.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log("instance.interceptors.response config ===>", config);
     return response;
   },
   (error: AxiosError) => {
@@ -28,7 +27,7 @@ instance.interceptors.response.use(
     } else {
       switch (error.response.status) {
         case 400:
-          message.error(error.response.data?.message || "请求参数错误");
+          message.error("请求参数错误");
           break;
         case 401:
           message.error("未授权，请重新登录");
@@ -55,7 +54,7 @@ instance.interceptors.response.use(
           message.error("网关超时");
           break;
         default:
-          message.error(error.response.data?.message || "请求失败");
+          message.error("请求失败");
       }
     }
   }
