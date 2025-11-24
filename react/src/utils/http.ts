@@ -8,17 +8,15 @@ const instance = axios.create({
 
 instance.interceptors.request.use(
   (config) => {
-    console.log("instance.interceptors.request config==>", config);
     return config;
   },
-  (err) => {
-    console.log("instance.interceptors.request err=>", err);
+  () => {
+    return Promise.reject(new Error("请求失败"));
   }
 );
 
 instance.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log("instance.interceptors.response config ===>", response);
     return response;
   },
   (error: AxiosError) => {

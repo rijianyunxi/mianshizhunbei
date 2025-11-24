@@ -1,6 +1,7 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
 import { UploadOutlined, UserOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, } from 'antd';
 
 const { Header, Content, Sider } = Layout;
 
@@ -27,9 +28,9 @@ const MainLayout: React.FC = () => {
                 >
                     <Menu theme="dark" mode="inline" defaultSelectedKeys={['1']} items={items} />
                 </Sider>
-                <Content style={{ margin: '16px',padding: '16px', background: "#fff" }}>
-                    <div >
-                        content
+                <Content style={{ margin: '16px', }}>
+                    <div style={{background: "#f7f7f7"}}>
+                        <Outlet></Outlet>
                     </div>
                 </Content>
             </Layout>

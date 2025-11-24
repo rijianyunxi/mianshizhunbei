@@ -7,3 +7,4 @@ import '@/assets/css/reset.css'
 createRoot(document.getElementById('root')!).render(
     <App />
 )
+
