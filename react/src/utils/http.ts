@@ -10,7 +10,7 @@ instance.interceptors.request.use(
   (config) => {
     return config;
   },
-  () => {
+  () => {    
     return Promise.reject(new Error("请求失败"));
   }
 );
@@ -56,6 +56,7 @@ instance.interceptors.response.use(
           message.error("请求失败");
       }
     }
+    return Promise.reject(error);
   }
 );
 type contentTypeType = "json" | "form" | "multipart";

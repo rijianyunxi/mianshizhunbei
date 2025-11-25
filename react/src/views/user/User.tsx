@@ -1,3 +1,4 @@
+import {useState} from "react";
 import type { FC } from "react";
 import { Input, Form, Select, Button } from "antd";
 import BaseTable from "@/components/BaseTable";
@@ -17,9 +18,11 @@ type UserType = {
 };
 
 const User: FC = () => {
+  const [params, setParams] = useState<FieldType>({});
   const [form] = Form.useForm();
   const onFinish = (values: FieldType) => {
     console.log(values);
+    setParams(values);
   };
 
   return (
@@ -38,14 +41,12 @@ const User: FC = () => {
           <Form.Item
             name="username"
             label="用户名"
-            rules={[{ required: true, message: "请输入用户名" }]}
           >
             <Input placeholder="请输入..." />
           </Form.Item>
           <Form.Item
             name="nickname"
             label="姓名"
-            rules={[{ required: true, message: "请输入姓名" }]}
           >
             <Input placeholder="请输入..." />
           </Form.Item>
@@ -53,7 +54,6 @@ const User: FC = () => {
             style={{ width: "240px" }}
             name="gender"
             label="性别"
-            rules={[{ required: true, message: "请选择性别" }]}
           >
             <Select
               allowClear
@@ -77,6 +77,7 @@ const User: FC = () => {
         <BaseTable<UserType>
           options={{
             url: "/user/list",
+            params,
             rowKey: "id",
             columns: [
               { title: "用户名", dataIndex: "username" },
