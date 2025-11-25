@@ -1,12 +1,19 @@
 import type { FC } from "react";
 import { Input, Form, Select, Button } from "antd";
-
-import UserTable from "./UserTable";
+import BaseTable from "@/components/BaseTable";
+// import UserTable from "./UserTable";
 
 type FieldType = {
   username?: string;
   password?: string;
   gender?: string;
+};
+
+type UserType = {
+  id: string;
+  username: string;
+  nickname: string;
+  gender: string;
 };
 
 const User: FC = () => {
@@ -66,7 +73,19 @@ const User: FC = () => {
       </div>
 
       <div style={{ padding: "16px 0" }}>
-        <UserTable />
+        {/* <UserTable /> */}
+        <BaseTable<UserType>
+          options={{
+            url: "/user/list",
+            rowKey: "id",
+            columns: [
+              { title: "用户名", dataIndex: "username" },
+              { title: "姓名", dataIndex: "nickname" },
+              { title: "性别", dataIndex: "gender" },
+            ],
+          }}
+        >
+        </BaseTable>
       </div>
     </>
   );
