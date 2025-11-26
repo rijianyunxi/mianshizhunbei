@@ -34,10 +34,11 @@ const IntersectionObserverDemo: FC = () => {
 
   return (
     <>
+    <h1 style={{ margin: "32px" }}>图片懒加载</h1>
       <div
         style={{
           height: "300px",
-          width: "300px",
+          width: "400px",
           border: "1px solid #ccc",
           overflowY: "auto",
         }}
