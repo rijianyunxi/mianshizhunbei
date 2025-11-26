@@ -7,7 +7,7 @@ import http from "@/utils/http";
 export interface BaseTableOptions<T extends object> {
   url: string;
   method?: "get" | "post";
-  params?: Record<string, any>;
+  params?: Record<string, string | number | boolean>;
   columns: TableColumnsType<T>;
   rowKey: string;
   pagination?: boolean;

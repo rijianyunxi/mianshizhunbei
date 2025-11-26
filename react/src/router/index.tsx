@@ -4,6 +4,8 @@ import NotFoundPage from "@/views/notFound/NotFound";
 import MainLayout from "@/layout/Layout";
 import TodoListReduxDemo from "@/views/demo/todoListReduxDemo/TodoListReduxDemo";
 import User from "@/views/user/User";
+import VirtualListDemo from "@/views/demo/virtualListDemo/VirtualListDemo";
+import IntersectionObserverDemo from "@/views/demo/IntersectionObserverDemo/IntersectionObserverDemo";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +30,18 @@ const router = createBrowserRouter([
   {
     path: "/todoListReduxDemo",
     element: <TodoListReduxDemo />,
+  },
+  {
+    path: "/virtualListDemo",
+    element: <VirtualListDemo />,
+  },
+    {
+    path: "/virtualListDemo",
+    element: <VirtualListDemo />,
+  },
+  {
+    path: "/intersectionObserverDemo",
+    element: <IntersectionObserverDemo />,
   },
   {
     path: "*",
