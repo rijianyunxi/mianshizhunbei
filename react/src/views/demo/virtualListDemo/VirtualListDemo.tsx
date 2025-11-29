@@ -14,7 +14,10 @@ const users: User[] = Array.from({ length: 1000 }, (_, i) => ({
 
 const VirtualListDemo: React.FC = () => {
   const testRef = useRef<HTMLParagraphElement>(null);
-
+  const dealScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLParagraphElement;
+    console.log(target.scrollTop, target.clientHeight, target.scrollHeight);
+  };
   useEffect(() => {
     setTimeout(() => {
       testRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -25,18 +28,20 @@ const VirtualListDemo: React.FC = () => {
       <h1 style={{ margin: "32px", fontSize: "24px" }}>scrollIntoView</h1>
 
       <div
+        onScroll={dealScroll}
         style={{
-          height: 300,
+          height: '300px',
           width: "100%",
           border: "1px solid #ccc",
           overflowY: "auto",
           position: "relative",
         }}
       >
+        {/* <p style={{height:'500px'}}></p> */}
         <p
           ref={testRef}
           style={{
-            height: 50,
+            height: '50px',
             width: "100%",
             textAlign: "center",
             backgroundColor: "#f0f0f0",
