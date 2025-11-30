@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    /* 模块与目标 */
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node", // 如何解析模块 (Node 模式)
+    "esModuleInterop": true,
+    /* 类型检查与严格模式 */
+    "strict": true,
+    "skipLibCheck": true,
+    /* 输出与路径 */
+    "sourceMap": true,
+    "outDir": "./dist-ts", // 方便调试，但 Webpack 会忽略这个输出目录
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "ESNext",
+      "dom"
+    ], // 包含环境库
+    "baseUrl": ".",
+    "paths": {
+        "@/*": ["./src/*"], 
+        
+    }
+  },
+  "include": [
+    "src/**/*" // 包含所有 src 目录下的文件
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
