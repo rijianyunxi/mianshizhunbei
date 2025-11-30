@@ -6,6 +6,7 @@ console.log('isProduction', isProduction);
 
 module.exports = {
     mode: isProduction ? 'production' : 'development',
+    devtool:isProduction ? false : 'source-map',
     entry: './src/main.ts',
     output: {
         path: path.resolve(__dirname, '../dist'),
@@ -21,9 +22,9 @@ module.exports = {
                 use: [
                     {
                         loader: 'babel-loader',
-                        options: {
-                            presets: ['@babel/preset-env'],
-                        }
+                        // options: {
+                        //     presets: ['@babel/preset-env'],
+                        // }
                     },
                     {
                         loader: 'ts-loader',
@@ -38,9 +39,9 @@ module.exports = {
                 use: [
                     {
                         loader: 'babel-loader',
-                        options: {
-                            presets: ['@babel/preset-env']
-                        }
+                        // options: {
+                        //     presets: ['@babel/preset-env']
+                        // }
                     }
                 ]
             },
