@@ -1,19 +1,6 @@
-import Log from '@/utils/Log'
-import '@/assets/reset.css'
-import Button from "@/utils/ClassMenu"
+import someTest from '@/someTest'
+const txt = require("../index.txt")
 
-const log = new Log();
+someTest()
 
-log.info<string>("hello webpak,i'm ts loader")
-
-log.danger<Error>(new Error("1111"))
-
-
-type MPick<T, K extends keyof T> = {
-    [P in K]: T[P]
-}
-
-
-const button: Button = new Button("c", 'd', 1)
-console.log(button,button.exec());
-
+document.body.innerText = txt;

@@ -1,0 +1,1 @@
+我是txt，测试txt-loader。

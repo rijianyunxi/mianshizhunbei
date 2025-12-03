@@ -1,12 +1,13 @@
 const path = require('path');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const loader = require('sass-loader');
 const isProduction = process.env.NODE_ENV === 'production';
 console.log('isProduction', isProduction);
 
 module.exports = {
     mode: isProduction ? 'production' : 'development',
-    devtool:isProduction ? false : 'source-map',
+    devtool: isProduction ? false : 'source-map',
     entry: './src/main.ts',
     output: {
         path: path.resolve(__dirname, '../dist'),
@@ -15,6 +16,16 @@ module.exports = {
     },
     module: {
         rules: [
+            // 测试txt
+            {
+                test: /\.txt$/,
+                use: [
+                    {
+                        loader: './loaders/txt-loader.js'
+                    }
+                ]
+
+            },
             // TS处理
             {
                 test: /\.ts$/,
