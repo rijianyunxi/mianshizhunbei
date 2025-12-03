@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <style>
+      :root {
+        /* 背景 */
+        --color-background-primary: #ffffff;
+        --color-background-secondary: #f4f4f4;
+        /* 文本 */
+        --color-text-primary: #333333;
+        /* 品牌色 */
+        --color-brand-primary: #007bff;
+      }
+
+      :root[data-theme="dark"] {
+        --color-background-primary: #121212;
+        --color-background-secondary: #1e1e1e;
+        --color-text-primary: #f0f0f0;
+        --color-brand-primary: #60a3ff;
+      }
+
+      .box {
+        width: 500px;
+        height: 500px;
+        background-color: var(--color-brand-primary);
+        transition: all 0.3s ease-in-out;
+        position: relative;
+      }
+      .child {
+        width: 200px;
+        height: 200px;
+        background-color: var(--color-text-primary);
+        transition: all 0.3s ease-in-out;
+        margin: auto;
+
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: none" class="box">
+      <div class="child"></div>
+    </div>
+
+    <button onclick="changeTheme()" id="theme-toggle">切换主题</button>
+    <script>
+      function changeTheme() {
+        document.documentElement.dataset.theme =
+          document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      }
+    </script>
+
+    <script>
+
+      for (var i = 0; i < 10; i++) {
+          setTimeout(() => {
+            console.log(i);
+          }, 1000);
+      }
+      // ((i) => {
+        //   setTimeout(() => {
+        //     console.log(i);
+        //   }, 1000);
+        // })(i);
+
+      // let map = new Map([
+      //   ["light", "dark"],
+      //   ["dark", "light"],
+      // ]);
+
+      // let obj = { name: 1};
+      // let arr = [99, 81];
+
+      // for (let key in obj) {
+      //   console.log(key, obj[key]);
+      // }
+      // for (let key of arr) {
+      //   console.log(key, arr[key]);
+      // }
+      // for (let key in map) {
+      //   console.log(key, map[key]);
+      // }
+    </script>
+  </body>
+</html>
