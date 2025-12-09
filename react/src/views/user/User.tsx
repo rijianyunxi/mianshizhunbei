@@ -2,7 +2,6 @@ import {useState} from "react";
 import type { FC } from "react";
 import { Input, Form, Select, Button } from "antd";
 import BaseTable from "@/components/BaseTable";
-// import UserTable from "./UserTable";
 
 type FieldType = {
   username?: string;
@@ -73,7 +72,6 @@ const User: FC = () => {
       </div>
 
       <div style={{ padding: "16px 0" }}>
-        {/* <UserTable /> */}
         <BaseTable<UserType>
           options={{
             url: "/user/list",

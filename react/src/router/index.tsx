@@ -6,6 +6,8 @@ import TodoListReduxDemo from "@/views/demo/todoListReduxDemo/TodoListReduxDemo"
 import User from "@/views/user/User";
 import VirtualListDemo from "@/views/demo/virtualListDemo/VirtualListDemo";
 import IntersectionObserverDemo from "@/views/demo/IntersectionObserverDemo/IntersectionObserverDemo";
+import ForwardRefDemo from "@/views/demo/forwardRefDemo/ForwardRefDemo"
+
 
 const router = createBrowserRouter([
   {
@@ -14,13 +16,13 @@ const router = createBrowserRouter([
 
     children: [
       {
-      index: true,
-      element: <Navigate to="user" replace />,
-    },
-    {
-      path: "user",
-      element: <User />,
-    },
+        index: true,
+        element: <Navigate to="user" replace />,
+      },
+      {
+        path: "user",
+        element: <User />,
+      },
     ],
   },
   {
@@ -32,10 +34,15 @@ const router = createBrowserRouter([
     element: <TodoListReduxDemo />,
   },
   {
+    path: "/ForwardRefDemo",
+    element: <ForwardRefDemo />,
+  },
+
+  {
     path: "/virtualListDemo",
     element: <VirtualListDemo />,
   },
-    {
+  {
     path: "/virtualListDemo",
     element: <VirtualListDemo />,
   },

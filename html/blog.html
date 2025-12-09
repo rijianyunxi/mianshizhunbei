@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimalist Blog - Dark Mode Supported</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // 启用手动 class 控制深色模式
+            theme: {
+                extend: {
+                    colors: {
+                        // 浅色模式配色 (Warm)
+                        'light-bg': '#F9F8F6', 
+                        'light-text': '#1a1a1a',
+                        'light-accent': '#C1A68D',
+                        
+                        // 深色模式配色 (Premium Dark)
+                        'dark-bg': '#121212',       /* 炭黑，非纯黑 */
+                        'dark-card': '#1E1E1E',     /* 稍微亮一点的背景 */
+                        'dark-text': '#E0E0E0',     /* 柔和白 */
+                        'dark-muted': '#888888',    /* 辅助灰 */
+                    },
+                    fontFamily: {
+                        'serif': ['"Noto Serif SC"', 'serif'],
+                        'sans': ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script>
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
+
+    <style>
+        /* 交互微动画 */
+        .hover-underline-animation {
+            display: inline-block;
+            position: relative;
+        }
+        .hover-underline-animation::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            transform: scaleX(0);
+            height: 1px;
+            bottom: -2px;
+            left: 0;
+            /* 浅色模式下线是黑的，深色模式下线是白的 */
+            background-color: currentColor; 
+            transform-origin: bottom right;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .hover-underline-animation:hover::after {
+            transform: scaleX(1);
+            transform-origin: bottom left;
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 1s ease-out forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+
+        /* 平滑过渡所有颜色变化 */
+        body, nav, div, p, h1, h2, a, svg {
+            transition-property: color, background-color, border-color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 500ms;
+        }
+    </style>
+</head>
+<body class="bg-light-bg text-light-text dark:bg-dark-bg dark:text-dark-text antialiased font-sans selection:bg-light-accent selection:text-white">
+
+    <nav class="fixed top-0 w-full bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur-sm z-50 py-8">
+        <div class="max-w-5xl mx-auto px-6 flex justify-between items-center">
+            <a href="#" class="font-serif text-2xl font-bold tracking-widest dark:text-white">ZEN.</a>
+            
+            <div class="flex items-center gap-8">
+                <div class="hidden md:flex space-x-8 text-sm tracking-widest font-medium">
+                    <a href="#" class="hover-underline-animation hover:text-black dark:hover:text-white">ESSAYS</a>
+                    <a href="#" class="hover-underline-animation hover:text-black dark:hover:text-white">PROJECTS</a>
+                    <a href="#" class="hover-underline-animation hover:text-black dark:hover:text-white">ABOUT</a>
+                </div>
+
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors focus:outline-none" aria-label="Toggle Dark Mode">
+                    <svg id="sun-icon" class="w-5 h-5 hidden dark:block text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <svg id="moon-icon" class="w-5 h-5 block dark:hidden text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
+                </button>
+                
+                 <div class="md:hidden text-2xl cursor-pointer">≡</div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="min-h-[85vh] flex flex-col justify-center items-center px-6 pt-20">
+        <div class="max-w-3xl text-center fade-in-up">
+            <p class="text-light-accent text-xs font-bold tracking-[0.2em] mb-6 uppercase">Design & Thinking</p>
+            <h1 class="font-serif text-5xl md:text-7xl leading-tight mb-8 font-light dark:text-white">
+                Less but <br> <span class="italic text-gray-500 dark:text-gray-400">Better.</span>
+            </h1>
+            <p class="text-gray-500 dark:text-dark-muted text-lg font-light max-w-lg mx-auto leading-relaxed delay-100 fade-in-up">
+                探索极简主义生活方式与数字设计的边界。<br>在此记录关于技术、美学与思考的碎片。
+            </p>
+        </div>
+        
+        <div class="absolute bottom-10 animate-bounce text-gray-400 dark:text-gray-600 text-sm">
+            ↓
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-6 pb-32">
+        <div class="border-t border-gray-200 dark:border-gray-800 mb-16"></div>
+        
+        <article class="group mb-20 fade-in-up delay-200 cursor-pointer">
+            <div class="flex flex-col md:flex-row gap-8 items-start">
+                <div class="md:w-1/3 overflow-hidden rounded-sm relative">
+                    <div class="absolute inset-0 bg-black opacity-0 dark:opacity-20 transition-opacity z-10 pointer-events-none"></div>
+                    <img src="https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
+                         alt="Minimalist" 
+                         class="w-full h-64 object-cover grayscale group-hover:grayscale-0 transition duration-700 ease-in-out transform group-hover:scale-105">
+                </div>
+                <div class="md:w-2/3 pt-2">
+                    <span class="text-xs text-gray-400 dark:text-gray-500 tracking-widest uppercase">Dec 07, 2025</span>
+                    <h2 class="font-serif text-3xl mt-3 mb-4 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-300 dark:text-gray-100">
+                        留白的艺术：为何我们需要数字排毒
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-400 font-light leading-relaxed mb-6 line-clamp-2">
+                        在这个信息过载的时代，空白并不意味着缺失，而是意味着无限的可能。探讨界面设计中的负空间运用与心流体验的关系...
+                    </p>
+                    <span class="text-xs font-bold border-b border-black dark:border-white pb-1 hover:text-light-accent hover:border-light-accent dark:hover:text-light-accent dark:hover:border-light-accent transition-colors">READ MORE</span>
+                </div>
+            </div>
+        </article>
+
+        <article class="group mb-20 fade-in-up delay-300 cursor-pointer">
+            <div class="flex flex-col md:flex-row gap-8 items-start">
+                <div class="md:w-1/3 overflow-hidden rounded-sm relative">
+                    <div class="absolute inset-0 bg-black opacity-0 dark:opacity-20 transition-opacity z-10 pointer-events-none"></div>
+                    <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
+                         alt="Fashion" 
+                         class="w-full h-64 object-cover grayscale group-hover:grayscale-0 transition duration-700 ease-in-out transform group-hover:scale-105">
+                </div>
+                <div class="md:w-2/3 pt-2">
+                    <span class="text-xs text-gray-400 dark:text-gray-500 tracking-widest uppercase">Nov 24, 2025</span>
+                    <h2 class="font-serif text-3xl mt-3 mb-4 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-300 dark:text-gray-100">
+                        排版的节奏感与呼吸
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-400 font-light leading-relaxed mb-6 line-clamp-2">
+                        文字不仅仅是信息的载体，更是视觉的旋律。通过调整行高与字间距，我们可以创造出具有音乐感的阅读体验...
+                    </p>
+                    <span class="text-xs font-bold border-b border-black dark:border-white pb-1 hover:text-light-accent hover:border-light-accent dark:hover:text-light-accent dark:hover:border-light-accent transition-colors">READ MORE</span>
+                </div>
+            </div>
+        </article>
+        
+    </main>
+
+    <footer class="bg-black dark:bg-[#0a0a0a] text-white py-20 border-t border-gray-800 dark:border-gray-900">
+        <div class="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-start">
+            <div class="mb-10 md:mb-0">
+                <div class="font-serif text-2xl font-bold tracking-widest mb-4">ZEN.</div>
+                <p class="text-gray-500 text-sm font-light">© 2025 Designed by Gemini.</p>
+            </div>
+            
+            <div class="flex gap-12 text-sm text-gray-400 font-light">
+                <div class="flex flex-col gap-4">
+                    <span class="text-white font-normal tracking-widest uppercase text-xs mb-2">Social</span>
+                    <a href="#" class="hover:text-white transition-colors">Twitter</a>
+                    <a href="#" class="hover:text-white transition-colors">Instagram</a>
+                    <a href="#" class="hover:text-white transition-colors">Dribbble</a>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <span class="text-white font-normal tracking-widest uppercase text-xs mb-2">Connect</span>
+                    <a href="#" class="hover:text-white transition-colors">Email Me</a>
+                    <a href="#" class="hover:text-white transition-colors">RSS Feed</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        themeToggleBtn.addEventListener('click', function() {
+            // 切换 class
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        });
+    </script>
+
+</body>
+</html>
