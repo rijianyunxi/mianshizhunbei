@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    // 1. 编译目标
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler", // 如果是用 Vite/Webpack 打包推荐用这个，如果是纯 Node 用 "node"
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    // 2. 严格模式 (强烈建议开启)
+    "strict": true,
+    "noImplicitAny": true,
+
+    // 3. 路径解析辅助
+    "baseUrl": ".",
+    "skipLibCheck": true, // 跳过 node_modules 的检查，提速
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    
+    // 4. 不生成输出文件 (因为通常由打包工具 Vite/Rollup 处理)
+    "noEmit": true
+  },
+  // 根目录通常不包含任何具体文件，只作为“模板”
+  "exclude": ["node_modules", "dist"],
+  "include": ["packages/**/*"]
+}

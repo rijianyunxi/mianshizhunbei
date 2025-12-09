@@ -11,6 +11,9 @@
   "license": "ISC",
   "devDependencies": {
     "eslint": "^9.39.1",
-    "rollup": "^4.53.3"
+    "globals": "^16.5.0",
+    "rollup": "^4.53.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0"
   }
 }

@@ -1,0 +1,19 @@
+{
+  // 1. 继承根目录的配置
+  "extends": "../../tsconfig.json",
+
+  "compilerOptions": {
+    // 你可以在这里覆盖根目录的配置
+    // 比如：如果这个包是纯 Node 工具，不需要 DOM 库
+    // "lib": ["ES2020"]
+    
+    // 如果需要设置路径别名 (Optional)
+    // "paths": {
+    //   "@/*": ["./src/*"]
+    // }
+  },
+
+  // 2. 指定当前包需要编译的文件范围
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
