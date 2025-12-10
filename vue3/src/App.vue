@@ -1,14 +1,18 @@
-<script setup lang="ts">
-import {ref} from 'vue'
+<script setup>
+import Vitur from './views/Vitur.vue'
 
 </script>
 
 <template>
   <div>
-    <h1>{{ msg }}</h1>
+    <h1>虚拟滚动</h1>
+    <Vitur></Vitur>
+    <!-- <Vitur></Vitur>
+    <Vitur></Vitur>
+    <Vitur></Vitur>
+    <Vitur></Vitur> -->
+
   </div>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>
