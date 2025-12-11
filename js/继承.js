@@ -119,3 +119,6 @@ function myNew(constructor, ...args) {
 }
 
 
+console.log(Function.__proto__ === Function.prototype);
+
+console.log(Function.prototype.__proto__ === Object.prototype);
