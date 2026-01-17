@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Filter Breaks Fixed Demo</title>
+    <style>
+        body {
+            height: 2000px; /* 搞长一点，产生滚动条以便测试 fixed */
+            background-color: #f0f0f0;
+            padding: 50px;
+        }
+
+        /* 罪魁祸首的父元素 */
+        .problematic-parent {
+            width: 300px;
+            height: 300px;
+            background-color: white;
+            border: 2px solid #333;
+            margin: 100px auto;
+            
+            /* 【关键点】 */
+            /* 哪怕只是加一点点滤镜，或者 opacity < 1，都会导致 fixed 失效 */
+            /* filter: grayscale(100%);  */
+
+            filter:blur(10px)
+            /* 试着把上面这行注释掉，fixed 就会恢复正常 */
+        }
+
+        /* 本应该固定在屏幕右下角的子元素 */
+        .fixed-child {
+            width: 100px;
+            height: 100px;
+            background-color: red;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 12px;
+
+            /* 这是为了固定在屏幕右下角 */
+            position: fixed;
+            top: 0px;
+            left: 0px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>滚动页面观察红色方块</h2>
+    <p>如果红色方块跟着灰色大方块一起跑了，说明 fixed 失效了。</p>
+    <p>如果红色方块死死钉在屏幕右下角不动，说明 fixed 正常。</p>
+
+    <div class="problematic-parent">
+        我是加了 filter 的父元素
+        <div class="fixed-child">
+            我是 fixed<br>但是失效了
+        </div>
+    </div>
+
+</body>
+</html>
