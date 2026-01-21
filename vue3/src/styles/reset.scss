@@ -1,0 +1,39 @@
+/* 1. 所有的元素默认使用 border-box，这非常重要！ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. 移除 body 的默认 margin */
+body {
+  margin: 0;
+  /* 3. 设置默认字体 (适配 Mac 和 Windows) */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  line-height: 1.5;
+  /* 4. 字体平滑 (让 Mac 字体看起来更细更清晰) */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 5. 图片自适应，防止图片撑破容器 */
+img, video, canvas, audio, iframe, embed, object {
+  display: block;
+  max-width: 100%;
+}
+
+/* 6. 去掉 input/button 的默认字体继承问题 */
+input, button, textarea, select {
+  font: inherit;
+}
+
+/* 7. 移除链接的下划线（可选，看设计风格） */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 8. 让列表默认没有圆点和边距 */
+ul, ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
