@@ -1,0 +1,10 @@
+{
+    "name": "@vue-mini/vue",
+    "version": "1.0.0",
+    "buildOptions": {
+        "name": "vue"
+    },
+    "dependencies": {
+        "@vue-mini/reactivity": "workspace:*"
+    }
+}

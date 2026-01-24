@@ -1,5 +1,7 @@
-import { count, addCount } from '@vue/shared'
+import { effect, reactive } from '@vue-mini/reactivity'
+console.log('hello vue');
 
-
-console.log('count',count);
-console.log('addCount',addCount());
+export{
+    effect,
+    reactive
+}

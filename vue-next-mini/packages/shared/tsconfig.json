@@ -1,0 +1,14 @@
+{
+  // 1. 继承根目录的“宪法”
+  "extends": "../../tsconfig.json", 
+
+  "compilerOptions": {
+    // 2. 重写：每个包有自己的输出目录
+    "outDir": "dist",
+    // 3. 重写：明确源码根目录
+    "noUnusedLocals": true
+  },
+
+  // 4. 关键：只编译当前包 src 下的代码，不看隔壁老王（其他包）的代码
+  "include": ["src"]
+}

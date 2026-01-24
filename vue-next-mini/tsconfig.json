@@ -1,37 +1,119 @@
 {
   "compilerOptions": {
-    "module": "esnext",
-    "target": "es5",
-    "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "@vue/*": ["packages/*/src"]
-    },
+    /* ====================
+       1. 基础编译环境设置
+       ==================== */
     
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "dist",
+    // 解析非相对模块名称的基准目录。配置 paths 必须先配置这个。
+    "baseUrl": ".",
+    
+    // 指定源代码的根目录。这有助于控制输出目录结构，确保 dist 里的结构和 src 一致。
+    "rootDir": ".",
+    
+    // 编译目标 JS 版本。
+    // 选 ESNext 是因为我们在写库，通常由使用者的打包工具（如 Vite/Webpack）去做降级兼容，我们只产出最干净的现代代码。
+    "target": "ESNext",
+    
+    // 生成代码的模块化标准。
+    // 必须用 ESM (ESNext)，这是现代前端库的标准，也是 Tree-shaking (摇树优化) 的基础。
+    "module": "ESNext",
+    
+    // 模块解析策略。
+    // 'bundler' 是 TS 5.0 新推出的，专门给 Vite、Rollup、Esbuild 等打包工具用的。
+    // 它允许你像在打包工具里那样导入文件（比如不写扩展名，或者识别 package.json 的 exports）。
+    "moduleResolution": "bundler",
+    
+    // 编译过程中需要引入的库定义。
+    // ESNext: 包含 Promise, Map, Set 等最新 JS 语法的类型定义。
+    // DOM: 包含 document, window, HTMLElement 等浏览器 API 的类型定义。
+    "lib": ["ESNext", "DOM"],
+    
+    // 默认包含的类型声明包。
+    // 加上 "node" 是为了让你在源码或脚本中能用 process, __dirname, console 等 Node.js 全局变量而不报错。
+    "types": ["node"],
 
+
+    /* ====================
+       2. 严格类型检查 (代码质量保障)
+       ==================== */
+    
+    // 开启所有严格的类型检查选项。Vue3 源码就是全严格模式，这能最大程度避免 Bug。
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    
+    // 不允许隐式的 any 类型。
+    // 如果 TS 推断不出类型，你必须显式写出 :any，否则报错。防止你偷懒写出不安全的代码。
+    "noImplicitAny": true,
+    
+    // 严格的空值检查。
+    // 开启后，null 和 undefined 是独立类型，不能赋值给 number 或 string。这是防止 "undefined is not a function" 的核心设置。
+    "strictNullChecks": true,
+    
+    // 检查未使用的局部变量。
+    // 如果你声明了一个变量但没用它，TS 会报错。保持代码整洁，类似 ESLint 的功能。
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
 
-    "jsx": "preserve",
 
-    "verbatimModuleSyntax": false,
+    /* ====================
+       3. 输出与构建产物 (d.ts 相关)
+       ==================== */
+    
+    // 自动生成 .d.ts 类型声明文件。
+    // 这是你写库（Library）必须要开的！否则别人用你的 mini-vue import 时就没有类型提示。
+    "declaration": true,
+    
+    // 生成 .d.ts.map 文件。
+    // 作用：当别人（或者你在调试时）按 F12 "转到定义" 时，能直接跳到你的 .ts 源码，而不是跳到 .d.ts 文件里。开发体验神器。
+    "declarationMap": true,
+    
+    // 生成 .js.map 文件。
+    // 作用：浏览器调试时，能看到 TS 源码而不是编译后的 JS。
+    "sourceMap": true,
+    
+    // 编译输出目录。
+    // 虽然子包通常会覆盖这个配置，但根目录留一个默认值是好习惯。
+    "outDir": "dist",
+    
+
+    /* ====================
+       4. 互操作性与工具链兼容
+       ==================== */
+    
+    // 允许从 CommonJS 模块中默认导入。
+    // 让你可以 import React from 'react' 而不需要 import * as React from 'react'。
+    "esModuleInterop": true,
+    
+    // 配合上面的选项，允许对没有默认导出的模块使用默认导入写法（为了类型检查不报错）。
+    "allowSyntheticDefaultImports": true,
+    
+    // 强制文件名大小写一致。
+    // Windows 不区分大小写，Linux/Mac 区分。开启这个可以防止 "我在 Windows 上跑通了，推到 CI/CD 上就挂了" 的情况。
+    "forceConsistentCasingInFileNames": true,
+    
+    // 确保每个文件都可以安全地被单独转译。
+    // Vite 和 esbuild 是"单文件转译"的（它们不读取类型信息）。
+    // 开启这个后，TS 会阻止你写出那些"单文件转译器"处理不了的代码（比如 const enum 或 仅用于类型的导出没加 type 关键字）。
     "isolatedModules": true,
+    
+    // 跳过 node_modules 里的类型定义文件检查。
+    // 别人的库可能有类型错误，我们管不了，不要让它导致我们的构建失败。同时能显著加快编译速度。
     "skipLibCheck": true,
 
-    "types": [],
-    "lib": ["esnext", "dom"]
+
+    /* ====================
+       5. Monorepo 核心魔法区域 (Path Mapping)
+       ==================== */
+    
+    // 路径别名映射。这是 Monorepo 开发体验的核心！
+    "paths": {
+      // 这里的配置告诉 VSCode 和 TS：
+      // 当我 import ... from "@vue-mini/reactivity" 时，
+      // 不要去 node_modules 里找，直接去 packages/reactivity/src 里找。
+      // 
+      // 效果：你修改了 reactivity 的源码，runtime-core 里立马就能感知到，不需要 build！
+      "@vue-mini/*": ["packages/*/src"] 
+    }
   },
-  "include": [
-    "packages/*/src"
-  ]
+  
+  // 排除不需要编译的文件
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -1,0 +1,13 @@
+{
+  "name": "@vue-mini/reactivity",
+  "version": "1.0.0",
+  "buildOptions": {
+    "name": "VueReactivity"
+  },
+  "dependencies": {
+    "@vue-mini/shared": "workspace:*"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js"
+  }
+}
