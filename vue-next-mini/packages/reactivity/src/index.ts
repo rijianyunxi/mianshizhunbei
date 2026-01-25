@@ -1,7 +1,4 @@
 
-console.log('hello reactivity....');
-export { reactive } from './reactive';
+export * from './reactive';
 
-export function effect(fn: () => void) {
-    fn();
-}
+export * from './effect';

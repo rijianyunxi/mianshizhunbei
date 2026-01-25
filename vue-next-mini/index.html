@@ -1,27 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Vue Mini Debug</title>
 </head>
+
 <body>
     <div id="app"></div>
-
-
     <script type="module">
-        // 解构我们在 package.json 里定义的全局变量名
         import { effect, reactive } from './dist/vue.js';
-
-        const obj = reactive({ count: 1 });
-
-        // effect(() => {
-        //     console.log('数据变了:', obj.count);
-        //     document.getElementById('app').innerText = obj.count;
-        // });
-
+        const obj = reactive({ name: 'xxx', age: 18 });
+        effect(() => {
+            document.getElementById('app').innerText = obj.age + obj.age;
+        });
         setTimeout(() => {
-            obj.count++;
+            obj.age++;
+
         }, 1000);
     </script>
 </body>
+
 </html>
