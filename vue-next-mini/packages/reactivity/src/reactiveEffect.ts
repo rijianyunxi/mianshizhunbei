@@ -14,11 +14,17 @@ export function track(target: object, key: string|symbol) {
             depsMap = new Map();
             targetMap.set(target, depsMap);
         }
-        let dep = depsMap.get(key);
+        let dep:Dep = depsMap.get(key);
         if(!dep) {
-            depsMap.set(key, dep = createDep(() => {
-                depsMap.delete(key);
-            }));
+            // 创建 dep
+            dep = createDep() as Dep;
+            
+            // === 核心优化 ===
+            // 不传闭包，而是把必要的上下文挂载到 dep 对象上
+            dep.depsMap = depsMap;
+            dep.key = key;
+            dep.cleanup = finalizeDepCleanup; // 所有 dep 共用同一个函数引用！
+            depsMap.set(key, dep);
         }
         trackEffect(activeEffect, dep);
 
@@ -28,18 +34,24 @@ export function track(target: object, key: string|symbol) {
 }
 
 
+// 1. 定义一个通用的清理函数 (只创建一次，全局复用)
+// 这是一个没有闭包的纯函数，它只操作传入参数
+function finalizeDepCleanup(dep: Dep) {
+    const { depsMap, key } = dep; // 从 dep 身上取数据
+    if (depsMap) {
+        depsMap.delete(key);
+    }
+    dep.depsMap = undefined; // 解除引用
+}
 
-
-function createDep(cleanup?: () => void) {
-    const dep = new Map<ReactiveEffect, number>() as Dep;
-    dep.cleanup = cleanup;
-    return dep;
+function createDep() {
+    return new Map<ReactiveEffect, number>() as Dep;
 }
 
 
 export function trigger(target: object, key: string|symbol,newValue?: any,oldValue?: any) {
         
-    console.log('trigger=====>', target, key, newValue, oldValue);
+    // console.log('trigger=====>', target, key, newValue, oldValue);
     const depsMap = targetMap.get(target);
         if(!depsMap) {
             return;

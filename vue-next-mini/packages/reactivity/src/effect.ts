@@ -1,9 +1,10 @@
 
-
 //  依赖集合类型， 继承自 Map<ReactiveEffect, ReactiveEffect> ， 并添加了 cleanup 方法
 export type Dep = Map<ReactiveEffect, number> & {
-    cleanup?: () => void;
-}
+    cleanup?: (dep: Dep) => void;
+    key?: string | symbol;
+    depsMap?: Map<any, any>;
+};
 
 
 /**
@@ -45,7 +46,7 @@ export class ReactiveEffect {
      * 初始值为 0， 每次run执行将effect._trackId 加 1， 用于触发更新时，判断是否需要触发更新
      * 主要是来判断一个effect里的多个重复依赖，避免重复收集
      */
-    
+
     _trackId = 0;
     // 依赖集合， 用于存储所有依赖该属性的effect
     deps: Dep[] = [];
@@ -83,41 +84,15 @@ export class ReactiveEffect {
     }
 }
 
-/**
- * 
- * @param effect 
- * 每次run执行将effect._depsLength 重置为 0， 并将effect._trackId 加 1
- * 用于触发更新时，判断是否需要触发更新 
- */
-function preClearnEffect(effect: ReactiveEffect) {
-    effect._depsLength = 0;
-    effect._trackId++;
-}
 
-function cleanDepEffect(effect: ReactiveEffect, dep: Dep) {
-    if (dep) {
-        dep.delete(effect);
-        if (dep.size === 0) {
-            dep.cleanup?.();
-        }
-    }
-}
 
-function postCleanEffect(effect: ReactiveEffect) {
-    if (effect.deps.length > effect._depsLength) {
-        for (let i = effect._depsLength; i < effect.deps.length; i++) {
-            cleanDepEffect(effect, effect.deps[i]);
-        }
-        effect._depsLength = effect.deps.length;
-    }
-}
 
 export function trackEffect(effect: ReactiveEffect, dep: Dep) {
-
+    // 根据当前effect的_trackId 判断是否需要是否为同一次key的依赖收集，相同的话表示重复收集，无需处理
     if (dep.get(effect) !== effect._trackId) {
-
+        // 不同的话表示为新的依赖收集，需要添加到依赖集合中或者替换旧的依赖的_trackId更新
         dep.set(effect, effect._trackId);
-
+        // 从deps取到当前deps _depsLength位置的依赖，与新的依赖进行比较
         let oldDep = effect.deps[effect._depsLength];
 
         if (oldDep !== dep) {
@@ -133,3 +108,33 @@ export function trackEffect(effect: ReactiveEffect, dep: Dep) {
 
 }
 
+
+/**
+ * 
+ * @param effect 
+ * 每次run执行将effect._depsLength 重置为 0， 并将effect._trackId 加 1
+ * 用于触发更新时，判断是否需要触发更新 
+ */
+function preClearnEffect(effect: ReactiveEffect) {
+    effect._depsLength = 0;
+    effect._trackId++;
+}
+
+
+function cleanDepEffect(effect: ReactiveEffect, dep: Dep) {
+    if (dep) {
+        dep.delete(effect);
+        if (dep.size === 0) {
+            dep.cleanup?.(dep);
+        }
+    }
+}
+
+function postCleanEffect(effect: ReactiveEffect) {
+    if (effect.deps.length > effect._depsLength) {
+        for (let i = effect._depsLength; i < effect.deps.length; i++) {
+            cleanDepEffect(effect, effect.deps[i]);
+        }
+        effect._depsLength = effect.deps.length;
+    }
+}

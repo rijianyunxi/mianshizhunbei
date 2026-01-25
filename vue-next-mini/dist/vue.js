@@ -49,26 +49,6 @@ var ReactiveEffect = class {
     }
   }
 };
-function preClearnEffect(effect2) {
-  effect2._depsLength = 0;
-  effect2._trackId++;
-}
-function cleanDepEffect(effect2, dep) {
-  if (dep) {
-    dep.delete(effect2);
-    if (dep.size === 0) {
-      dep.cleanup?.();
-    }
-  }
-}
-function postCleanEffect(effect2) {
-  if (effect2.deps.length > effect2._depsLength) {
-    for (let i = effect2._depsLength; i < effect2.deps.length; i++) {
-      cleanDepEffect(effect2, effect2.deps[i]);
-    }
-    effect2._depsLength = effect2.deps.length;
-  }
-}
 function trackEffect(effect2, dep) {
   if (dep.get(effect2) !== effect2._trackId) {
     dep.set(effect2, effect2._trackId);
@@ -82,6 +62,26 @@ function trackEffect(effect2, dep) {
   }
   console.log("effect", effect2);
 }
+function preClearnEffect(effect2) {
+  effect2._depsLength = 0;
+  effect2._trackId++;
+}
+function cleanDepEffect(effect2, dep) {
+  if (dep) {
+    dep.delete(effect2);
+    if (dep.size === 0) {
+      dep.cleanup?.(dep);
+    }
+  }
+}
+function postCleanEffect(effect2) {
+  if (effect2.deps.length > effect2._depsLength) {
+    for (let i = effect2._depsLength; i < effect2.deps.length; i++) {
+      cleanDepEffect(effect2, effect2.deps[i]);
+    }
+    effect2._depsLength = effect2.deps.length;
+  }
+}
 
 // packages/reactivity/src/reactiveEffect.ts
 var targetMap = /* @__PURE__ */ new Map();
@@ -94,21 +94,27 @@ function track(target, key) {
     }
     let dep = depsMap.get(key);
     if (!dep) {
-      depsMap.set(key, dep = createDep(() => {
-        depsMap.delete(key);
-      }));
+      dep = createDep();
+      dep.depsMap = depsMap;
+      dep.key = key;
+      dep.cleanup = finalizeDepCleanup;
+      depsMap.set(key, dep);
     }
     trackEffect(activeEffect, dep);
     console.log("targetMap", targetMap);
   }
 }
-function createDep(cleanup) {
-  const dep = /* @__PURE__ */ new Map();
-  dep.cleanup = cleanup;
-  return dep;
+function finalizeDepCleanup(dep) {
+  const { depsMap, key } = dep;
+  if (depsMap) {
+    depsMap.delete(key);
+  }
+  dep.depsMap = void 0;
+}
+function createDep() {
+  return /* @__PURE__ */ new Map();
 }
 function trigger(target, key, newValue, oldValue) {
-  console.log("trigger=====>", target, key, newValue, oldValue);
   const depsMap = targetMap.get(target);
   if (!depsMap) {
     return;

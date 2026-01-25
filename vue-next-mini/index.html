@@ -10,13 +10,12 @@
     <div id="app"></div>
     <script type="module">
         import { effect, reactive } from './dist/vue.js';
-        const obj = reactive({ name: 'xxx', age: 18 });
+        const obj = reactive({ flag: true, a:'sjt',b:'jz' });
         effect(() => {
-            document.getElementById('app').innerText = obj.age + obj.age;
+            document.getElementById('app').innerText = obj.flag ? obj.a : obj.b;
         });
         setTimeout(() => {
-            obj.age++;
-
+            obj.flag = false;
         }, 1000);
     </script>
 </body>
