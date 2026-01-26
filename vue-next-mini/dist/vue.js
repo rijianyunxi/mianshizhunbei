@@ -237,15 +237,8 @@ function trackRefValue(ref2) {
   }
 }
 function triggerRefValue(ref2) {
-  console.log(
-    "triggerRefValue=====>",
-    ref2,
-    isTracking()
-  );
-  if (isTracking()) {
-    if (ref2.dep) {
-      triggerEffects(ref2.dep);
-    }
+  if (ref2.dep) {
+    triggerEffects(ref2.dep);
   }
 }
 export {
