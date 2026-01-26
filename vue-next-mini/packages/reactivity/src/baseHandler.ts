@@ -1,4 +1,6 @@
+import { reactive } from './reactive';
 import { track, trigger } from './reactiveEffect';
+import { isObject } from "@vue-mini/shared";
 
 export const baseHandler: ProxyHandler<object> = {
         get(target, key, receiver) {
@@ -8,6 +10,10 @@ export const baseHandler: ProxyHandler<object> = {
             }
             track(target, key);
             const res = Reflect.get(target, key, receiver);
+            if (isObject(res)) {
+                return reactive(res);
+            }
+            
             return res;
         },
         set(target, key, value, receiver) {

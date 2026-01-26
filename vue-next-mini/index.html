@@ -9,14 +9,44 @@
 <body>
     <div id="app"></div>
     <script type="module">
-        import { effect, reactive } from './dist/vue.js';
-        const obj = reactive({ flag: true, a:'sjt',b:'jz' });
+        import { effect, reactive ,ref} from './dist/vue.js';
+        const obj = reactive({ flag: true, a:'sjt',b:'jz',c:{d:1} });
+        /**
+         * 分支测试
+         * 当 flag 为 true 时，显示 a，为 false 时，显示 b
+         * 1秒后，将 flag 设为 false，显示 b
+         * 
+        */
+        // effect(() => {
+        //     document.getElementById('app').innerText = obj.flag ? obj.a : obj.b;
+        // });
+        // setTimeout(() => {
+        //     obj.flag = false;
+        // }, 1000);
+
+
+        // 深度proxy测试
+        // effect(() => {
+        //     document.getElementById('app').innerText = obj.c.d;
+        // });
+        // setTimeout(() => {
+        //      obj.c.d = '222223';
+        // }, 1000);
+
+        // ref测试
+        const a = ref(true);
+        const b = ref('sjt');
+
         effect(() => {
-            document.getElementById('app').innerText = obj.flag ? obj.a : obj.b;
+            document.getElementById('app').innerText = a.value ? b.value : '-';
         });
+
         setTimeout(() => {
-            obj.flag = false;
+            a.value = false;
         }, 1000);
+
+
+
     </script>
 </body>
 

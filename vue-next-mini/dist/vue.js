@@ -4,14 +4,27 @@ function isObject(value) {
 }
 
 // packages/reactivity/src/effect.ts
-var activeEffect = null;
-function effect(fn, options = {}) {
+var activeEffect = void 0;
+var shouldTrack = true;
+function effect(fn, options) {
   const _effect = new ReactiveEffect(fn, () => {
     _effect.run();
   });
+  if (options) {
+    Object.assign(_effect, options);
+  }
   _effect.run();
+  const runner = _effect.run.bind(_effect);
+  runner.effect = _effect;
+  return runner;
 }
 var ReactiveEffect = class {
+  constructor(fn, scheduler) {
+    this.fn = fn;
+    this.scheduler = scheduler;
+    this.fn = fn;
+    this.scheduler = scheduler;
+  }
   // 当作指针来用，方便替换新增或者删除后续多余依赖的删除
   _depsLength = 0;
   /**
@@ -22,13 +35,8 @@ var ReactiveEffect = class {
   _trackId = 0;
   // 依赖集合， 用于存储所有依赖该属性的effect
   deps = [];
-  fn;
-  scheduler;
   active = true;
-  constructor(fn, scheduler) {
-    this.fn = fn;
-    this.scheduler = scheduler;
-  }
+  onStop;
   run() {
     if (!this.active) {
       return this.fn();
@@ -49,18 +57,23 @@ var ReactiveEffect = class {
     }
   }
 };
-function trackEffect(effect2, dep) {
-  if (dep.get(effect2) !== effect2._trackId) {
-    dep.set(effect2, effect2._trackId);
-    let oldDep = effect2.deps[effect2._depsLength];
+function isTracking() {
+  return shouldTrack && activeEffect !== void 0;
+}
+function trackEffects(dep) {
+  if (activeEffect === void 0) {
+    return;
+  }
+  if (dep.get(activeEffect) !== activeEffect._trackId) {
+    dep.set(activeEffect, activeEffect._trackId);
+    let oldDep = activeEffect.deps[activeEffect._depsLength];
     if (oldDep !== dep) {
-      cleanDepEffect(effect2, oldDep);
-      effect2.deps[effect2._depsLength++] = dep;
+      cleanDepEffect(activeEffect, oldDep);
+      activeEffect.deps[activeEffect._depsLength++] = dep;
     } else {
-      effect2._depsLength++;
+      activeEffect._depsLength++;
     }
   }
-  console.log("effect", effect2);
 }
 function preClearnEffect(effect2) {
   effect2._depsLength = 0;
@@ -82,6 +95,19 @@ function postCleanEffect(effect2) {
     effect2._depsLength = effect2.deps.length;
   }
 }
+function triggerEffects(dep) {
+  for (const effect2 of dep.keys()) {
+    if (effect2 !== activeEffect) {
+      if (effect2.scheduler) {
+        effect2.scheduler();
+      } else {
+        effect2.run();
+      }
+    } else {
+      console.warn("vue3-mini  \u5FAA\u73AF\u4F9D\u8D56");
+    }
+  }
+}
 
 // packages/reactivity/src/reactiveEffect.ts
 var targetMap = /* @__PURE__ */ new Map();
@@ -100,7 +126,7 @@ function track(target, key) {
       dep.cleanup = finalizeDepCleanup;
       depsMap.set(key, dep);
     }
-    trackEffect(activeEffect, dep);
+    trackEffects(dep);
     console.log("targetMap", targetMap);
   }
 }
@@ -111,8 +137,10 @@ function finalizeDepCleanup(dep) {
   }
   dep.depsMap = void 0;
 }
-function createDep() {
-  return /* @__PURE__ */ new Map();
+function createDep(fn) {
+  let dep = /* @__PURE__ */ new Map();
+  dep.cleanup = fn;
+  return dep;
 }
 function trigger(target, key, newValue, oldValue) {
   const depsMap = targetMap.get(target);
@@ -123,13 +151,7 @@ function trigger(target, key, newValue, oldValue) {
   if (!dep) {
     return;
   }
-  for (const effect2 of dep.keys()) {
-    if (effect2.scheduler) {
-      effect2.scheduler();
-    } else {
-      effect2.run();
-    }
-  }
+  triggerEffects(dep);
 }
 
 // packages/reactivity/src/baseHandler.ts
@@ -140,6 +162,9 @@ var baseHandler = {
     }
     track(target, key);
     const res = Reflect.get(target, key, receiver);
+    if (isObject(res)) {
+      return reactive(res);
+    }
     return res;
   },
   set(target, key, value, receiver) {
@@ -158,6 +183,9 @@ function reactive(target) {
   const proxy = createReactiveObject(target);
   return proxy;
 }
+function toReactive(target) {
+  return target ? reactive(target) : target;
+}
 function createReactiveObject(target) {
   if (!isObject(target)) {
     return target;
@@ -172,8 +200,57 @@ function createReactiveObject(target) {
   reactiveMap.set(target, proxy);
   return proxy;
 }
+
+// packages/reactivity/src/ref.ts
+function ref(value) {
+  return createRef(value);
+}
+function createRef(value) {
+  return new RefImpl(value);
+}
+var RefImpl = class {
+  constructor(rawValue) {
+    this.rawValue = rawValue;
+    this._value = toReactive(rawValue);
+  }
+  _value;
+  dep = void 0;
+  __v_isRef = true;
+  get value() {
+    trackRefValue(this);
+    return this._value;
+  }
+  set value(newValue) {
+    if (this.rawValue !== newValue) {
+      this.rawValue = newValue;
+      this._value = toReactive(newValue);
+      triggerRefValue(this);
+    }
+  }
+};
+function trackRefValue(ref2) {
+  if (isTracking()) {
+    if (!ref2.dep) {
+      ref2.dep = createDep();
+    }
+    trackEffects(ref2.dep);
+  }
+}
+function triggerRefValue(ref2) {
+  console.log(
+    "triggerRefValue=====>",
+    ref2,
+    isTracking()
+  );
+  if (isTracking()) {
+    if (ref2.dep) {
+      triggerEffects(ref2.dep);
+    }
+  }
+}
 export {
   effect,
-  reactive
+  reactive,
+  ref
 };
 //# sourceMappingURL=vue.js.map

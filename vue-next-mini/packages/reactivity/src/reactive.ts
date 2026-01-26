@@ -7,6 +7,10 @@ export function reactive<T extends object>(target: T): T {
     return proxy as T;
 }
 
+export function toReactive<T>(target: T): T {
+    return target ? reactive(target as any) as any : target;
+}
+
 
 function createReactiveObject(target: object) {
     if (!isObject(target)) {
