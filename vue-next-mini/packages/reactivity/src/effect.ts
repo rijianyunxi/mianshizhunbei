@@ -180,7 +180,8 @@ function postCleanEffect(effect: ReactiveEffect) {
         for (let i = effect._depsLength; i < effect.deps.length; i++) {
             cleanDepEffect(effect, effect.deps[i]);
         }
-        effect._depsLength = effect.deps.length;
+        // effect._depsLength = effect.deps.length;
+        effect.deps.length = effect._depsLength;
     }
 }
 

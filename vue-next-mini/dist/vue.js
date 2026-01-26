@@ -92,7 +92,7 @@ function postCleanEffect(effect2) {
     for (let i = effect2._depsLength; i < effect2.deps.length; i++) {
       cleanDepEffect(effect2, effect2.deps[i]);
     }
-    effect2._depsLength = effect2.deps.length;
+    effect2.deps.length = effect2._depsLength;
   }
 }
 function triggerEffects(dep) {
