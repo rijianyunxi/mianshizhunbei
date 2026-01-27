@@ -33,11 +33,24 @@ var ReactiveEffect = class {
    * 主要是来判断一个effect里的多个重复依赖，避免重复收集
    */
   _trackId = 0;
+  /**
+   * 依赖收集的 dirtyLevel ， 用于判断是否需要触发更新
+   * 初始值为 0， 每次run执行将effect._dir 加 4， 用于触发更新时，判断是否需要触发更新
+   * 主要是来判断一个effect里的多个重复依赖，避免重复收集
+   */
+  _dirtyLevel = 4 /* DIRTY */;
   // 依赖集合， 用于存储所有依赖该属性的effect
   deps = [];
   active = true;
   onStop;
+  get dirty() {
+    return this._dirtyLevel === 4 /* DIRTY */;
+  }
+  set dirty(value) {
+    this._dirtyLevel = value ? 4 /* DIRTY */ : 0 /* NO_DIRTY */;
+  }
   run() {
+    this._dirtyLevel = 0 /* NO_DIRTY */;
     if (!this.active) {
       return this.fn();
     }
@@ -97,6 +110,9 @@ function postCleanEffect(effect2) {
 }
 function triggerEffects(dep) {
   for (const effect2 of dep.keys()) {
+    if (effect2._dirtyLevel < 4 /* DIRTY */) {
+      effect2._dirtyLevel = 4 /* DIRTY */;
+    }
     if (effect2 !== activeEffect) {
       if (effect2.scheduler) {
         effect2.scheduler();
@@ -157,7 +173,7 @@ function trigger(target, key, newValue, oldValue) {
 // packages/reactivity/src/baseHandler.ts
 var baseHandler = {
   get(target, key, receiver) {
-    if (key === "__v_isReactive") {
+    if (key === "__v_isReactive" /* IS_REACTIVE */) {
       return true;
     }
     track(target, key);
@@ -193,7 +209,7 @@ function createReactiveObject(target) {
   if (reactiveMap.has(target)) {
     return reactiveMap.get(target);
   }
-  if (target.__v_isReactive) {
+  if (target["__v_isReactive" /* IS_REACTIVE */]) {
     return target;
   }
   const proxy = new Proxy(target, baseHandler);
@@ -241,9 +257,41 @@ function triggerRefValue(ref2) {
     triggerEffects(ref2.dep);
   }
 }
+
+// packages/reactivity/src/computed.ts
+function computed(getter) {
+  return new ComputedRefImpl(getter);
+}
+var ComputedRefImpl = class {
+  _value;
+  effect;
+  dep;
+  constructor(getter) {
+    this.effect = new ReactiveEffect(getter, () => {
+      triggerRefValue(this);
+    });
+  }
+  get value() {
+    if (this.effect.dirty) {
+      this._value = this.effect.run();
+      trackRefValue(this);
+    }
+    return this._value;
+  }
+};
 export {
+  ReactiveEffect,
+  activeEffect,
+  computed,
   effect,
+  isTracking,
   reactive,
-  ref
+  ref,
+  shouldTrack,
+  toReactive,
+  trackEffects,
+  trackRefValue,
+  triggerEffects,
+  triggerRefValue
 };
 //# sourceMappingURL=vue.js.map

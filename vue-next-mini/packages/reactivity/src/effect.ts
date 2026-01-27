@@ -1,3 +1,4 @@
+import { DirtyLevel } from "./constants";
 
 //  依赖集合类型， 继承自 Map<ReactiveEffect, ReactiveEffect> ， 并添加了 cleanup 方法
 export type Dep = Map<ReactiveEffect, number> & {
@@ -88,6 +89,12 @@ export class ReactiveEffect {
      * 主要是来判断一个effect里的多个重复依赖，避免重复收集
      */
     public _trackId: number = 0;
+    /**
+     * 依赖收集的 dirtyLevel ， 用于判断是否需要触发更新
+     * 初始值为 0， 每次run执行将effect._dir 加 4， 用于触发更新时，判断是否需要触发更新
+     * 主要是来判断一个effect里的多个重复依赖，避免重复收集
+     */
+    public _dirtyLevel: number = DirtyLevel.DIRTY;
     // 依赖集合， 用于存储所有依赖该属性的effect
     public deps: Dep[] = [];
     public active: boolean = true;
@@ -97,7 +104,18 @@ export class ReactiveEffect {
         this.scheduler = scheduler;
     }
 
+    public get dirty() {
+        return this._dirtyLevel === DirtyLevel.DIRTY;
+    }
+
+    public set dirty(value: boolean) {
+        this._dirtyLevel = value ? DirtyLevel.DIRTY : DirtyLevel.NO_DIRTY;
+    }
+    
     run() {
+        // 每次run执行将effect._dirtyLevel 加 4， 用于触发更新时，判断是否需要触发更新
+        // this._dirtyLevel += DirtyLevel.DIRTY;
+        this._dirtyLevel = DirtyLevel.NO_DIRTY;
         if (!this.active) {
             return this.fn();
         }
@@ -180,24 +198,18 @@ function postCleanEffect(effect: ReactiveEffect) {
         for (let i = effect._depsLength; i < effect.deps.length; i++) {
             cleanDepEffect(effect, effect.deps[i]);
         }
-        // effect._depsLength = effect.deps.length;
         effect.deps.length = effect._depsLength;
     }
 }
 
 // 触发依赖更新
 export function triggerEffects(dep: Dep) {
-    // const effects = [...dep.keys()];
-    // for (let i = 0; i < effects.length; i++) {
-    //     const effect = effects[i];
-    //     if (effect.scheduler) {
-    //         effect.scheduler();
-    //     } else {
-    //         effect.run();
-    //     }
-    // }
-
     for (const effect of dep.keys()) {
+
+        if (effect._dirtyLevel < DirtyLevel.DIRTY) {
+            effect._dirtyLevel = DirtyLevel.DIRTY;
+        }
+
         if (effect !== activeEffect) {
             if (effect.scheduler) {
                 effect.scheduler();

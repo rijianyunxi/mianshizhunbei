@@ -39,17 +39,22 @@ class RefImpl<T> {
     }
 }
 
-function trackRefValue(ref: RefImpl<any>) {
+
+
+interface RefBase {
+    dep?: Dep;
+}
+export function trackRefValue(ref: RefBase) {
     if (isTracking()) {
         if (!ref.dep) {
             ref.dep = createDep();
         }
-        trackEffects(ref.dep);
+        trackEffects(ref.dep!);
     }
 }
 
 
-function triggerRefValue(ref: RefImpl<any>) {
+export function triggerRefValue(ref: RefBase) {
     if (ref.dep) {
         triggerEffects(ref.dep);
     }

@@ -9,7 +9,7 @@
 <body>
     <div id="app"></div>
     <script type="module">
-        import { effect, reactive ,ref} from './dist/vue.js';
+        import { effect, reactive ,ref,computed} from './dist/vue.js';
         const obj = reactive({ flag: true, a:'sjt',b:'jz',c:{d:1} });
         /**
          * 分支测试
@@ -34,17 +34,34 @@
         // }, 1000);
 
         // ref测试
-        const a = ref(true);
-        const b = ref('sjt');
+        // const a = ref(true);
+        // const b = ref('sjt');
 
-        effect(() => {
-            document.getElementById('app').innerText = a.value ? b.value : '-';
+        // effect(() => {
+        //     document.getElementById('app').innerText = a.value ? b.value : '-';
+        // });
+
+        // setTimeout(() => {
+        //     a.value = false;
+        //     console.log(
+        //         'setTimeout=====>',a,b
+        //     );
+        // }, 1000);
+
+        // computed测试
+        const myComputed = computed(() => {
+            return obj.a + obj.b;
         });
 
+        effect(() => {
+            document.getElementById('app').innerText = myComputed.value;
+        });
+
+
         setTimeout(() => {
-            a.value = false;
+            obj.a = '111111';
             console.log(
-                'setTimeout=====>',a,b
+                'setTimeout=====>',myComputed.value
             );
         }, 1000);
 

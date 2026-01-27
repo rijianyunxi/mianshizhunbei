@@ -1,7 +1,11 @@
-import { effect, reactive, ref } from '@vue-mini/reactivity'
+export * from '@vue-mini/reactivity'
 
-export{
-    effect,
-    reactive,
-    ref,
-}
+
+
+// import { effect, reactive, ref } from '@vue-mini/reactivity'
+
+// export{
+//     effect,
+//     reactive,
+//     ref,
+// }

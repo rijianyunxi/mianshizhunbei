@@ -1,11 +1,12 @@
 import { reactive } from './reactive';
 import { track, trigger } from './reactiveEffect';
 import { isObject } from "@vue-mini/shared";
+import { ReactiveFlags } from './constants';
 
 export const baseHandler: ProxyHandler<object> = {
         get(target, key, receiver) {
             // console.log('proxy data get=====>',key, ':', value);
-            if (key === '__v_isReactive') {
+            if (key === ReactiveFlags.IS_REACTIVE) {
                 return true;
             }
             track(target, key);

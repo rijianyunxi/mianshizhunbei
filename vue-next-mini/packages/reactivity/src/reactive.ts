@@ -1,5 +1,6 @@
 import { isObject } from "@vue-mini/shared";
 import { baseHandler } from "./baseHandler";
+import { ReactiveFlags } from "./constants";
 const reactiveMap = new WeakMap<object, object>();
 
 export function reactive<T extends object>(target: T): T {
@@ -19,7 +20,7 @@ function createReactiveObject(target: object) {
     if (reactiveMap.has(target)) {
         return reactiveMap.get(target)!;
     }
-    if ((target as any).__v_isReactive) {
+    if ((target as any)[ReactiveFlags.IS_REACTIVE]) {
         return target;
     }
     const proxy = new Proxy(target, baseHandler);
