@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        *{
+            padding: 0;
+            margin: 0;
+        }
+        .box{
+            overflow: hidden;
+            width: 600px;
+            height: 600px;
+            background-color: #f7f7f7;
+        }
+        .one{
+            margin-top: 100px;
+            width: 200px;
+            height: 200px;
+            background-color: pink;
+        }
+        .two{
+            margin-top: 100px;
+            width: 200px;
+            height: 200px;
+            background-color: #add8e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="one">one</div>
+        <div class="two">
+            two
+        </div>
+    </div>
+
+    <script>
+        // var one = document.querySelector('.one');
+        // var two = document.querySelector('.two');
+        // console.log(one.offsetTop);
+        // console.log(two.offsetTop);
+
+        let one = document.querySelector('.one');
+        let two = document.querySelector('.two');
+        console.log(one.getBoundingClientRect());
+        console.log(two.getBoundingClientRect());
+    </script>
+</body>
+</html>
