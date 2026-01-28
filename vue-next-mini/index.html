@@ -9,8 +9,8 @@
 <body>
     <div id="app"></div>
     <script type="module">
-        import { effect, reactive ,ref,computed} from './dist/vue.js';
-        const obj = reactive({ flag: true, a:'sjt',b:'jz',c:{d:1} });
+        import { effect, reactive, ref, computed } from './dist/vue.js';
+        const obj = reactive({ flag: true, a: 'sjt', b: 'jz', c: { d: 1 } });
         /**
          * 分支测试
          * 当 flag 为 true 时，显示 a，为 false 时，显示 b
@@ -52,21 +52,12 @@
         const myComputed = computed(() => {
             return obj.a + obj.b;
         });
-
         effect(() => {
             document.getElementById('app').innerText = myComputed.value;
         });
-
-
         setTimeout(() => {
-            obj.a = '111111';
-            console.log(
-                'setTimeout=====>',myComputed.value
-            );
+            obj.a = '88888';
         }, 1000);
-
-
-
     </script>
 </body>
 

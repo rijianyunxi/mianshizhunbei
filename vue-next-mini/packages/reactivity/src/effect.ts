@@ -1,4 +1,4 @@
-import { DirtyLevel } from "./constants";
+import { DirtyLevel } from "@vue-mini/shared";
 
 //  依赖集合类型， 继承自 Map<ReactiveEffect, ReactiveEffect> ， 并添加了 cleanup 方法
 export type Dep = Map<ReactiveEffect, number> & {

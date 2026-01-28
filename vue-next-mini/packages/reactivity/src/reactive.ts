@@ -1,6 +1,6 @@
 import { isObject } from "@vue-mini/shared";
 import { baseHandler } from "./baseHandler";
-import { ReactiveFlags } from "./constants";
+import { ReactiveFlags } from "@vue-mini/shared";
 const reactiveMap = new WeakMap<object, object>();
 
 export function reactive<T extends object>(target: T): T {

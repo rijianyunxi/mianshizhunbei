@@ -231,7 +231,7 @@ var RefImpl = class {
   }
   _value;
   dep = void 0;
-  __v_isRef = true;
+  ["__v_isRef" /* IS_REF */] = true;
   get value() {
     trackRefValue(this);
     return this._value;

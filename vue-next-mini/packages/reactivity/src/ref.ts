@@ -1,3 +1,4 @@
+import { ReactiveFlags } from "@vue-mini/shared";
 import { trackEffects, isTracking, triggerEffects } from "./effect";
 import type { Dep } from "./effect";
 import { toReactive } from "./reactive";
@@ -19,7 +20,7 @@ function createRef<T>(value: T): RefImpl<T> {
 class RefImpl<T> {
     public _value: T;
     public dep?: Dep = undefined;
-    public readonly __v_isRef = true;
+    public readonly [ReactiveFlags.IS_REF] = true;
     constructor(public rawValue: T) {
         this._value = toReactive(rawValue);
 
@@ -59,3 +60,6 @@ export function triggerRefValue(ref: RefBase) {
         triggerEffects(ref.dep);
     }
 }
+
+
+
