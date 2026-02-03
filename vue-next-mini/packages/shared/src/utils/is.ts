@@ -88,3 +88,9 @@ export function isReactive(value: unknown): boolean {
     // 如果 value 是个 Proxy，读取会被 get 拦截 -> 返回 true
     return !!(value && (value as any)[ReactiveFlags.IS_REACTIVE]);
 }
+
+
+const onRE = /^on[^a-z]/
+
+// 2. 导出函数
+export const isOn = (key: string) => onRE.test(key)
