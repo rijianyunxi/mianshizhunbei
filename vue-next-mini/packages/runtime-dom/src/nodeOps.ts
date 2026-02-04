@@ -1,10 +1,14 @@
+import type { NodeOps } from "@vue-mini/runtime-core";
 
-// 为了支持 TypeScript 类型，引入一些内置接口
 export const svgNS = 'http://www.w3.org/2000/svg'
 
 const doc = (typeof document !== 'undefined' ? document : null) as Document
 
-export const nodeOps = {
+
+
+
+
+export const nodeOps: NodeOps = {
   // 1. 插入节点
   // anchor 是锚点，如果为 null，insertBefore 等同于 appendChild
   insert: (child: Node, parent: Node, anchor: Node | null) => {
