@@ -5,6 +5,7 @@
         "name": "vue"
     },
     "dependencies": {
-        "@vue-mini/reactivity": "workspace:*"
+        "@vue-mini/reactivity": "workspace:*",
+        "@vue-mini/runtime-dom":"workspace:*"
     }
 }

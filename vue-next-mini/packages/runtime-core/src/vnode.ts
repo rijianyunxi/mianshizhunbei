@@ -2,6 +2,7 @@
 
 // VNode 也就是虚拟节点，它本质就是一个普通的 JS 对象
 export interface VNode {
+  __v_isVNode: true;
   // === 核心属性 ===
   
   // 1. 节点类型
@@ -14,7 +15,8 @@ export interface VNode {
   props: any;
 
   // 3. 子节点 (字符串、数组、或插槽对象)
-  children: string | VNode[] | null;
+  // children: string | VNode[] | null ;
+  children: any;
 
   // 4. 真实 DOM 引用 (用于 Diff 过程中的直接操作)
   // 在 mount 阶段会被赋值
@@ -30,5 +32,10 @@ export interface VNode {
 
   // 7. 组件实例引用 (只有当 type 是组件时才有值)
   // 用于在更新组件时找到对应的 instance
-  component: any | null; 
+  component?: any | null; 
+}
+
+
+export function isVNode(value: any): value is VNode {
+  return value ? value.__v_isVNode === true : false;
 }

@@ -52,6 +52,9 @@ importers:
       '@vue-mini/reactivity':
         specifier: workspace:*
         version: link:../reactivity
+      '@vue-mini/runtime-dom':
+        specifier: workspace:*
+        version: link:../runtime-dom
 
 packages:
 

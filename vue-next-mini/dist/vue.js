@@ -2,6 +2,10 @@
 function isObject(value) {
   return typeof value === "object" && value !== null;
 }
+var isArray = Array.isArray;
+var isString = (val) => typeof val === "string";
+var onRE = /^on[^a-z]/;
+var isOn = (key) => onRE.test(key);
 
 // packages/reactivity/src/effect.ts
 var activeEffect = void 0;
@@ -279,14 +283,336 @@ var ComputedRefImpl = class {
     return this._value;
   }
 };
+
+// packages/runtime-dom/src/nodeOps.ts
+var svgNS = "http://www.w3.org/2000/svg";
+var doc = typeof document !== "undefined" ? document : null;
+var nodeOps = {
+  // 1. 插入节点
+  // anchor 是锚点，如果为 null，insertBefore 等同于 appendChild
+  insert: (child, parent, anchor) => {
+    parent.insertBefore(child, anchor || null);
+  },
+  // 2. 移除节点
+  remove: (child) => {
+    const parent = child.parentNode;
+    if (parent) {
+      parent.removeChild(child);
+    }
+  },
+  // 3. 创建元素节点
+  // isSVG: 是否是 SVG 标签
+  // is: 用于 Web Components 的 is 属性
+  createElement: (tag, isSVG, is, props) => {
+    const el = isSVG ? doc.createElementNS(svgNS, tag) : doc.createElement(tag, is ? { is } : void 0);
+    if (tag === "select" && props && props.multiple != null) {
+      ;
+      el.setAttribute("multiple", "multiple");
+    }
+    return el;
+  },
+  // 4. 创建文本节点
+  createText: (text) => doc.createTextNode(text),
+  // 5. 创建注释节点
+  createComment: (text) => doc.createComment(text),
+  // 6. 设置文本节点的内容 (用于更新 Text 类型节点)
+  setText: (node, text) => {
+    node.nodeValue = text;
+  },
+  // 7. 设置元素节点的文本内容 (用于 element.textContent)
+  // 这是个优化操作，比先清空再插入 textNode 快
+  setElementText: (el, text) => {
+    el.textContent = text;
+  },
+  // 8. 获取父节点
+  parentNode: (node) => node.parentNode,
+  // 9. 获取下一个兄弟节点 (用于遍历)
+  nextSibling: (node) => node.nextSibling,
+  // 10. 查询元素 (用于 Teleport 或挂载根节点)
+  querySelector: (selector) => doc.querySelector(selector),
+  // 11. 设置 Scope ID (用于 scoped css)
+  setScopeId(el, id) {
+    el.setAttribute(id, "");
+  },
+  // 克隆节点 (用于静态提升 Static Hoisting 的优化)
+  cloneNode(el) {
+    return el.cloneNode(true);
+  }
+};
+
+// packages/runtime-dom/src/modules/class.ts
+function patchClass(el, value, isSVG) {
+  const transitionClasses = el._vtc;
+  if (transitionClasses) {
+    value = (value ? [value, ...transitionClasses] : [...transitionClasses]).join(" ");
+  }
+  if (value == null) {
+    el.removeAttribute("class");
+  } else if (isSVG) {
+    el.setAttribute("class", value);
+  } else {
+    el.className = value;
+  }
+}
+
+// packages/runtime-dom/src/modules/style.ts
+function patchStyle(el, prev, next) {
+  const style = el.style;
+  const isCssString = isString(next);
+  if (next && !isCssString) {
+    for (const key in next) {
+      setStyle(style, key, next[key]);
+    }
+    if (prev && !isString(prev)) {
+      for (const key in prev) {
+        if (next[key] == null) {
+          setStyle(style, key, "");
+        }
+      }
+    }
+  } else {
+    if (isCssString) {
+      if (prev !== next) {
+        style.cssText = next;
+      }
+    } else if (prev) {
+      el.removeAttribute("style");
+    }
+  }
+}
+function setStyle(style, name, val) {
+  if (val == null) val = "";
+  style[name] = val;
+}
+
+// packages/runtime-dom/src/modules/events.ts
+function patchEvent(el, rawName, prevValue, nextValue) {
+  const invokers = el._vei || (el._vei = {});
+  const existingInvoker = invokers[rawName];
+  if (nextValue && existingInvoker) {
+    existingInvoker.value = nextValue;
+  } else {
+    const name = parseName(rawName);
+    if (nextValue) {
+      const invoker = invokers[rawName] = createInvoker(nextValue);
+      el.addEventListener(name, invoker);
+    } else if (existingInvoker) {
+      el.removeEventListener(name, existingInvoker);
+      invokers[rawName] = void 0;
+    }
+  }
+}
+function createInvoker(initialValue) {
+  const invoker = (e) => {
+    const value = invoker.value;
+    if (Array.isArray(value)) {
+      value.forEach((fn) => fn(e));
+    } else {
+      value(e);
+    }
+  };
+  invoker.value = initialValue;
+  return invoker;
+}
+function parseName(rawName) {
+  return rawName.slice(2).toLowerCase();
+}
+
+// packages/runtime-dom/src/modules/props.ts
+function patchDOMProp(el, key, value) {
+  if (key === "value" && el.tagName === "INPUT") {
+    el.value = value == null ? "" : value;
+    return;
+  }
+  if (value === "" || value == null) {
+    const type = typeof el[key];
+    if (type === "boolean") {
+      el[key] = false;
+      return;
+    }
+  }
+  el[key] = value;
+}
+
+// packages/runtime-dom/src/modules/attrs.ts
+function patchAttr(el, key, value) {
+  if (value == null) {
+    el.removeAttribute(key);
+  } else {
+    el.setAttribute(key, value);
+  }
+}
+
+// packages/runtime-dom/src/patchProp.ts
+var patchProp = (el, key, prevValue, nextValue, isSVG = false) => {
+  if (key === "class") {
+    patchClass(el, nextValue, isSVG);
+  } else if (key === "style") {
+    patchStyle(el, prevValue, nextValue);
+  } else if (isOn(key)) {
+    patchEvent(el, key, prevValue, nextValue);
+  } else if (shouldSetAsProp(el, key, nextValue, isSVG)) {
+    patchDOMProp(el, key, nextValue);
+  } else {
+    patchAttr(el, key, nextValue);
+  }
+};
+function shouldSetAsProp(el, key, value, isSVG) {
+  if (isSVG) {
+    return key === "innerHTML" || key === "textContent";
+  }
+  if (key === "spellcheck" || key === "draggable" || key === "translate") {
+    return false;
+  }
+  if (key === "form") {
+    return false;
+  }
+  if (key === "list" && el.tagName === "INPUT") {
+    return false;
+  }
+  if (key === "type" && el.tagName === "TEXTAREA") {
+    return false;
+  }
+  if (key in el) {
+    return true;
+  }
+  return false;
+}
+
+// packages/runtime-core/src/vnode.ts
+function isVNode(value) {
+  return value ? value.__v_isVNode === true : false;
+}
+
+// packages/runtime-core/src/renderer.ts
+function createRenderer(rendererOptions2) {
+  const {
+    insert: hostInsert,
+    remove: hostRemove,
+    createElement: hostCreateElement,
+    createText: hostCreateText,
+    setText: hostSetText,
+    setElementText: hostSetElementText,
+    parentNode: hostParentNode,
+    nextSibling: hostNextSibling,
+    patchProp: hostPatchProp
+  } = rendererOptions2;
+  const mountchildren = (children, container) => {
+    for (let item of children) {
+      if (!isVNode(item)) {
+        hostInsert(hostCreateText(String(item)), container, null);
+      } else {
+        patch(container._vnode || null, item, container);
+      }
+    }
+  };
+  const mountElement = (vnode, container) => {
+    let { type, props, children, shapeFlag } = vnode;
+    console.log({ type, props, children, shapeFlag });
+    const el = hostCreateElement(type);
+    if (props) {
+      for (let key in props) {
+        hostPatchProp(el, key, null, props[key]);
+      }
+    }
+    if (shapeFlag & 8 /* TEXT_CHILDREN */) {
+      hostSetElementText(el, children);
+    } else {
+      console.log("mountchildren", { children, el });
+      mountchildren(children, el);
+    }
+    hostInsert(el, container, null);
+  };
+  const patch = (n1, n2, container) => {
+    if (n1 === n2) return;
+    mountElement(n2, container);
+  };
+  const render2 = (vnode, container) => {
+    patch(container._vnode || null, vnode, container);
+    container._vnode = vnode;
+  };
+  return {
+    render: render2,
+    patch
+  };
+}
+
+// packages/runtime-core/src/createVNode.ts
+var createVNode = (type, props = null, children = null) => {
+  const shapeFlag = isString(type) ? 1 /* ELEMENT */ : isObject(type) ? 4 /* STATEFUL_COMPONENT */ : 0;
+  const vnode = {
+    __v_isVNode: true,
+    // 内部属性，标识这是一个 VNode
+    type,
+    props,
+    children,
+    shapeFlag,
+    el: null,
+    // 真实 DOM，挂载后才有值
+    key: props && props.key,
+    // 提取 key 用于 Diff
+    component: null
+    // 组件实例
+  };
+  normalizeChildren(vnode, children);
+  return vnode;
+};
+function normalizeChildren(vnode, children) {
+  let type = 0;
+  const { shapeFlag } = vnode;
+  if (children == null) {
+    children = null;
+  } else if (Array.isArray(children)) {
+    type = 16 /* ARRAY_CHILDREN */;
+  } else if (typeof children === "object") {
+  } else {
+    children = String(children);
+    type = 8 /* TEXT_CHILDREN */;
+  }
+  vnode.children = children;
+  vnode.shapeFlag |= type;
+}
+
+// packages/runtime-core/src/h.ts
+function h(type, propsOrChildren, children) {
+  const l = arguments.length;
+  if (l === 2) {
+    if (isObject(propsOrChildren) && !isArray(propsOrChildren)) {
+      if (isVNode(propsOrChildren)) {
+        return createVNode(type, null, [propsOrChildren]);
+      }
+      return createVNode(type, propsOrChildren);
+    } else {
+      return createVNode(type, null, propsOrChildren);
+    }
+  } else {
+    if (l > 3) {
+      children = Array.prototype.slice.call(arguments, 2);
+    } else if (l === 3 && isVNode(children)) {
+      children = [children];
+    }
+    return createVNode(type, propsOrChildren, children);
+  }
+}
+
+// packages/runtime-dom/src/index.ts
+var rendererOptions = Object.assign({}, nodeOps, {
+  patchProp
+});
+function render(vnode, container) {
+  createRenderer(rendererOptions).render(vnode, container);
+}
 export {
   ReactiveEffect,
   activeEffect,
   computed,
+  createRenderer,
   effect,
+  h,
   isTracking,
   reactive,
   ref,
+  render,
   shouldTrack,
   toReactive,
   trackEffects,
