@@ -115,7 +115,9 @@ function myNew(constructor, ...args) {
     let result = constructor.apply(obj, args);
     
     // 4. 返回新对象
-    return result instanceof Object ? result : obj;
+    return (result !== null && (typeof result === 'object' || typeof result === 'function')) 
+        ? result 
+        : obj;
 }
 
 

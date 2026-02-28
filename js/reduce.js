@@ -1,21 +1,12 @@
-// let arr = [1,2,3,4,5,6]
-let arr = [5,9]
+let arr = [1,2,3,4,5,6]
 
 
 
-Array.prototype.reduce1 = function(){
-    for(let i = 0;i<this.length;i++){
-        
-    }
+// 实现reduce方法
+
+Array.prototype.reduce1 = function(callback, initialValue){
+
+
+
+
 }
-
-
-let res = arr.reduce((pre,next)=>{
-    console.log({
-        pre,next
-    });
-    
-    return pre + next
-})
-
-console.log('res',res);
