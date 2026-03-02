@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Web Worker 多线程性能压测</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { padding: 10px 15px; margin-right: 10px; cursor: pointer; border: none; border-radius: 4px; color: white; transition: 0.3s; }
+        .btn-single { background: #ff4757; }
+        .btn-multi { background: #2ed573; }
+        pre { background: #2f3542; color: #ced6e0; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .timer { font-weight: bold; color: #3742fa; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>多线程任务统计测试</h2>
+    <p>任务描述：计算 4 组耗时任务（每组循环 20 亿次累加）。</p>
+    <input type="text" placeholder="在这里打字测试交互是否卡顿...">
+    
+    <div style="margin-top: 20px;">
+        <button class="btn-single" onclick="runSingleThread()">主线程 (单线程顺序执行)</button>
+        <button class="btn-multi" onclick="runMultiThread()">Web Worker (4线程并行执行)</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>执行日志：</h3>
+    <pre id="log">等待操作...</pre>
+</div>
+
+<script>
+// 1. 定义 Worker 的代码字符串 (避免创建物理文件)
+const workerCode = `
+    self.onmessage = function(e) {
+        const { id, count } = e.data;
+        const start = performance.now();
+        let sum = 0;
+        for (let i = 0; i < count; i++) {
+            sum += i;
+        }
+        const end = performance.now();
+        self.postMessage({ id, time: end - start, sum });
+    };
+`;
+
+// 将代码转为 Blob URL
+const blob = new Blob([workerCode], { type: 'application/javascript' });
+const workerUrl = URL.createObjectURL(blob);
+
+const logBox = document.getElementById('log');
+const TASK_COUNT = 4; // 开启4个任务
+const ITERATIONS = 2000000000; // 每个任务循环20亿次
+
+function log(msg) { logBox.innerText += msg + '\n'; }
+
+// --- 方案 A: 主线程单线程执行 ---
+async function runSingleThread() {
+    logBox.innerText = "--- 开始单线程压测 (主线程) ---\n";
+    const totalStart = performance.now();
+
+    for (let i = 1; i <= TASK_COUNT; i++) {
+        log(`任务 ${i} 正在计算...`);
+        // 强制同步计算（阻塞 UI）
+        const start = performance.now();
+        let sum = 0;
+        for (let j = 0; j < ITERATIONS; j++) { sum += j; }
+        const end = performance.now();
+        log(`任务 ${i} 完成，耗时: ${(end - start).toFixed(2)} ms`);
+    }
+
+    const totalEnd = performance.now();
+    log(`\n✅ 所有任务结束！`);
+    log(`总计耗时 (累加制): ${(totalEnd - totalStart).toFixed(2)} ms`);
+}
+
+// --- 方案 B: Web Worker 多线程并行 ---
+function runMultiThread() {
+    logBox.innerText = "--- 开始多线程并行压测 (4个Worker) ---\n";
+    const totalStart = performance.now();
+    let completed = 0;
+
+    for (let i = 1; i <= TASK_COUNT; i++) {
+        const worker = new Worker(workerUrl);
+        
+        worker.onmessage = function(e) {
+            completed++;
+            log(`Worker ${e.data.id} 返回，该线程耗时: ${e.data.time.toFixed(2)} ms`);
+            
+            if (completed === TASK_COUNT) {
+                const totalEnd = performance.now();
+                log(`\n✅ 所有线程结束！`);
+                log(`总计耗时 (并行制): ${(totalEnd - totalStart).toFixed(2)} ms`);
+            }
+            worker.terminate(); // 任务完成，关闭线程
+        };
+
+        log(`线程 ${i} 已启动...`);
+        worker.postMessage({ id: i, count: ITERATIONS });
+    }
+}
+</script>
+
+</body>
+</html>
