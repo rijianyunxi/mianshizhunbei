@@ -1,10 +1,12 @@
 <script setup>
-// import Vitur from './views/Vitur.vue'
-
+  import VueVirtualScrollerMine from './views/VueVirtualScrollerMine.vue'
+  import RenderTest from './views/RenderTest.vue'
 </script>
 
 <template>
-  <router-view></router-view>
+  <VueVirtualScrollerMine></VueVirtualScrollerMine>
+  <RenderTest></RenderTest>
+  <!-- <router-view></router-view> -->
 </template>
 
 <style scoped></style>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        img {
+            width: 200px;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <input type="file">
+    <img src="" alt="">
+
+    <script>
+        let input = document.querySelector('input[type="file"]');
+        input.addEventListener('change', function(e) {
+            let file = e.target.files[0];
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function() {
+                let img = document.querySelector('img');
+                img.src = reader.result;
+            }
+            // let blob = URL.createObjectURL(file);
+            // let img = document.querySelector('img');
+            // img.src = blob;
+        })
+
+
+        function toggleImg(){
+            let img = document.querySelector('img');
+            img.style.display = img.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
