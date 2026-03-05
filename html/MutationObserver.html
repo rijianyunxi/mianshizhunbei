@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1>测试</h1>
+
+    <script>
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          console.log(mutation);
+        });
+      });
+      observer.observe(document.querySelector("h1"), {
+        attributes: true, // 监听属性 (style, class 等)
+        childList: true, // 监听内部元素的增减
+        characterData: true, // 监听文本节点的变化
+      });
+    //   observer.disconnect()
+
+      setTimeout(()=>{
+        document.querySelector('h1').style.color = 'red'
+      },3000)
+    </script>
+  </body>
+</html>
