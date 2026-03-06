@@ -14,6 +14,16 @@ app.use(async (ctx, next) => {
     await next();
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown server error';
+    console.error('[server] request failed', {
+      method: ctx.method,
+      path: ctx.path,
+      status: ctx.status || 500,
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    if (ctx.headerSent || !ctx.writable) {
+      return;
+    }
     ctx.status = 500;
     ctx.body = {
       error: {

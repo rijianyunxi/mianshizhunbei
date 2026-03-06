@@ -1,4 +1,4 @@
-﻿export function prepareSSE(ctx) {
+export function prepareSSE(ctx) {
   ctx.req.setTimeout(0);
   ctx.status = 200;
   ctx.respond = false;
@@ -10,10 +10,21 @@
   }
 }
 
+function canWrite(ctx) {
+  return Boolean(ctx?.res && !ctx.res.writableEnded && !ctx.res.destroyed);
+}
+
 export function sendSSEData(ctx, data) {
-  ctx.res.write(`data: ${JSON.stringify(data)}\n\n`);
+  if (!canWrite(ctx)) return false;
+  try {
+    ctx.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function endSSE(ctx) {
+  if (!canWrite(ctx)) return;
   ctx.res.end();
 }

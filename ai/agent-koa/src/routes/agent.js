@@ -1,19 +1,19 @@
-﻿import Router from '@koa/router';
+import Router from '@koa/router';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { endSSE, prepareSSE, sendSSEData } from '../utils/sse.js';
 
 const agentChatSchema = z.object({
   sessionId: z.string().uuid().optional(),
-  input: z.string().min(1),
+  input: z.string().trim().min(1).max(4000),
   stream: z.boolean().optional().default(false),
-  model: z.string().optional(),
+  model: z.string().trim().min(1).max(120).optional(),
   siteContext: z
     .object({
-      projectName: z.string().optional(),
-      city: z.string().optional(),
-      weather: z.string().optional(),
-      operationType: z.string().optional(),
+      projectName: z.string().max(200).optional(),
+      city: z.string().max(100).optional(),
+      weather: z.string().max(200).optional(),
+      operationType: z.string().max(200).optional(),
       shift: z.enum(['day', 'night']).optional(),
     })
     .optional(),
@@ -21,7 +21,11 @@ const agentChatSchema = z.object({
 
 function withSiteContext(input, siteContext) {
   if (!siteContext) return input;
-  return `${input}\n\n[\u5de5\u5730\u4e0a\u4e0b\u6587]\n${JSON.stringify(siteContext, null, 2)}`;
+  return `${input}\n\n[工地上下文]\n${JSON.stringify(siteContext, null, 2)}`;
+}
+
+function toErrorMessage(error) {
+  return error instanceof Error ? error.message : 'Unknown server error';
 }
 
 export const agentRouter = new Router();
@@ -39,49 +43,67 @@ agentRouter.post('/agent/chat', async (ctx) => {
 
   const payload = parsed.data;
   const sessionId = payload.sessionId ?? smartConstructionAgent.createSessionId();
-  const history = smartConstructionAgent.getSessionHistory(sessionId);
   const userInput = withSiteContext(payload.input, payload.siteContext);
-  const requestMessages = [...history, { role: 'user', content: userInput }];
-
-  smartConstructionAgent.appendSessionMessage(sessionId, { role: 'user', content: userInput });
+  const messages = [{ role: 'user', content: userInput }];
 
   if (!payload.stream) {
-    const result = await smartConstructionAgent.run({
-      model: payload.model,
-      messages: requestMessages,
-    });
+    try {
+      const result = await smartConstructionAgent.run({
+        sessionId,
+        persistSession: true,
+        model: payload.model,
+        messages,
+      });
 
-    const nextHistory = smartConstructionAgent.appendSessionMessage(sessionId, {
-      role: 'assistant',
-      content: result.text,
-    });
-
-    ctx.body = {
-      sessionId,
-      reply: result.text,
-      history: nextHistory,
-    };
-    return;
+      ctx.body = {
+        sessionId,
+        reply: result.text,
+        history: smartConstructionAgent.getSessionHistory(sessionId),
+      };
+      return;
+    } catch (error) {
+      console.error('[agent-route] non-stream failed', {
+        sessionId,
+        model: payload.model,
+        message: toErrorMessage(error),
+      });
+      ctx.status = 500;
+      ctx.body = {
+        error: 'Agent execution failed',
+        message: toErrorMessage(error),
+      };
+      return;
+    }
   }
 
   prepareSSE(ctx);
   sendSSEData(ctx, { sessionId, type: 'start' });
 
-  let fullText = '';
-  await smartConstructionAgent.stream({
-    model: payload.model,
-    messages: requestMessages,
-    onToken: (token) => {
-      fullText += token;
-      sendSSEData(ctx, { sessionId, type: 'delta', delta: token });
-    },
-  });
+  try {
+    await smartConstructionAgent.stream({
+      sessionId,
+      persistSession: true,
+      model: payload.model,
+      messages,
+      onToken: (token) => {
+        sendSSEData(ctx, { sessionId, type: 'delta', delta: token });
+      },
+    });
 
-  smartConstructionAgent.appendSessionMessage(sessionId, {
-    role: 'assistant',
-    content: fullText.trim(),
-  });
-
-  sendSSEData(ctx, { sessionId, type: 'done' });
-  endSSE(ctx);
+    sendSSEData(ctx, { sessionId, type: 'done' });
+  } catch (error) {
+    console.error('[agent-route] stream failed', {
+      sessionId,
+      model: payload.model,
+      message: toErrorMessage(error),
+    });
+    sendSSEData(ctx, {
+      sessionId,
+      type: 'error',
+      message: toErrorMessage(error),
+    });
+    sendSSEData(ctx, { sessionId, type: 'done' });
+  } finally {
+    endSSE(ctx);
+  }
 });
