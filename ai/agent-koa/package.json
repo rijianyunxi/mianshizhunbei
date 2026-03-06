@@ -1,0 +1,26 @@
+{
+  "name": "agent-koa",
+  "version": "1.0.0",
+  "description": "Koa + LangChainJS agent server for smart construction scenarios.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "chat": "node src/scripts/chatCli.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^15.3.1",
+    "@langchain/core": "^1.1.31",
+    "@langchain/openai": "^1.2.12",
+    "dotenv": "^17.3.1",
+    "koa": "^3.1.2",
+    "koa-bodyparser": "^4.4.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  }
+}
