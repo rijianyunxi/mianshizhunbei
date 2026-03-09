@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ZH_TEXT } from '../app/copy'
 import {
-  CHAT_MESSAGES_STORAGE_KEY,
   CHAT_THEME_STORAGE_KEY,
   CHAT_THREAD_ID_STORAGE_KEY,
   getSystemTheme,
@@ -10,6 +9,8 @@ import {
 import type {
   ChatMessage,
   ChatMessageToolTrace,
+  ConversationMessage,
+  ConversationSummary,
   SelectedToolItem,
   Theme,
   ToolEventLogItem,
@@ -17,12 +18,21 @@ import type {
   ToolStreamInfo,
 } from '../app/types'
 import { requestAgentReplyStream } from '../services/chatApi'
+import {
+  createConversation,
+  deleteConversation,
+  getConversationMessages,
+  listConversations,
+} from '../services/conversationApi'
 import { makeId } from '../utils/chat'
 import { usePersistentState } from './usePersistentState'
 import { useMcpAdmin, type UseMcpAdminResult } from './useMcpAdmin'
 
 type UseChatAppResult = {
   theme: Theme
+  conversations: ConversationSummary[]
+  conversationsLoading: boolean
+  messagesLoading: boolean
   messages: ChatMessage[]
   threadId: string
   draft: string
@@ -34,6 +44,9 @@ type UseChatAppResult = {
   setDraft: (value: string) => void
   sendMessage: () => Promise<void>
   clearConversation: () => void
+  createConversation: () => Promise<void>
+  selectConversation: (threadId: string) => Promise<void>
+  deleteConversation: (threadId: string) => Promise<void>
   toggleTheme: () => void
   toggleSettings: () => void
   closeSettings: () => void
@@ -47,114 +60,12 @@ function createEmptyToolTrace(): ChatMessageToolTrace {
   }
 }
 
-function normalizePersistedToolTrace(input: unknown): ChatMessageToolTrace | undefined {
-  if (!input || typeof input !== 'object') {
-    return undefined
-  }
-
-  const value = input as Partial<ChatMessageToolTrace>
-
-  const runningTools = Array.isArray(value.runningTools)
-    ? value.runningTools.filter((item): item is ToolStatusItem => {
-        if (!item || typeof item !== 'object') {
-          return false
-        }
-
-        const row = item as Partial<ToolStatusItem>
-        return (
-          typeof row.id === 'string'
-          && typeof row.name === 'string'
-          && (row.state === 'running' || row.state === 'done' || row.state === 'error')
-        )
-      })
-    : []
-
-  const selectedTools = Array.isArray(value.selectedTools)
-    ? value.selectedTools.filter((item): item is SelectedToolItem => {
-        if (!item || typeof item !== 'object') {
-          return false
-        }
-
-        const row = item as Partial<SelectedToolItem>
-        return typeof row.key === 'string' && typeof row.serverId === 'string' && typeof row.name === 'string'
-      })
-    : []
-
-  const events = Array.isArray(value.events)
-    ? value.events.filter((item): item is ToolEventLogItem => {
-        if (!item || typeof item !== 'object') {
-          return false
-        }
-
-        const row = item as Partial<ToolEventLogItem>
-        return typeof row.id === 'string' && typeof row.name === 'string' && (row.phase === 'start' || row.phase === 'end')
-      })
-    : []
-
-  if (runningTools.length === 0 && selectedTools.length === 0 && events.length === 0) {
-    return undefined
-  }
-
+function toChatMessage(row: ConversationMessage): ChatMessage {
   return {
-    runningTools,
-    selectedTools,
-    events,
-  }
-}
-
-function normalizePersistedMessages(input: unknown): ChatMessage[] {
-  if (!Array.isArray(input)) {
-    return []
-  }
-
-  const messages: ChatMessage[] = []
-  for (const item of input) {
-    if (!item || typeof item !== 'object') {
-      continue
-    }
-
-    const record = item as Partial<ChatMessage>
-    const role = record.role
-    if (role !== 'user' && role !== 'assistant') {
-      continue
-    }
-
-    if (typeof record.id !== 'string' || typeof record.content !== 'string') {
-      continue
-    }
-
-    messages.push({
-      id: record.id,
-      role,
-      content: record.content,
-      toolTrace: normalizePersistedToolTrace(record.toolTrace),
-    })
-  }
-
-  return messages
-}
-
-function loadPersistedMessages(): ChatMessage[] {
-  try {
-    const raw = window.localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY)
-    if (!raw) {
-      return []
-    }
-    return normalizePersistedMessages(JSON.parse(raw) as unknown)
-  } catch {
-    return []
-  }
-}
-
-function persistMessages(messages: ChatMessage[]): void {
-  try {
-    window.localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages))
-  } catch {
-    try {
-      window.localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages.slice(-200)))
-    } catch {
-      // Ignore quota errors and keep runtime messages only.
-    }
+    id: `srv-${row.id}`,
+    role: row.role,
+    content: row.content,
+    createdAt: row.createdAt,
   }
 }
 
@@ -167,7 +78,11 @@ export function useChatApp(): UseChatAppResult {
     deserialize: (raw) => raw,
     serialize: (value) => value,
   })
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadPersistedMessages())
+
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [conversationsLoading, setConversationsLoading] = useState(false)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -177,19 +92,87 @@ export function useChatApp(): UseChatAppResult {
   const mcp = useMcpAdmin()
   const mcpRefresh = mcp.refresh
 
+  const sortedConversations = useMemo(
+    () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
+    [conversations],
+  )
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      persistMessages(messages)
-    }, 120)
+  const refreshConversations = useCallback(async () => {
+    const items = await listConversations(200)
+    setConversations(items)
+    return items
+  }, [])
 
-    return () => {
-      window.clearTimeout(timer)
+  const loadThreadMessages = useCallback(async (nextThreadId: string) => {
+    if (!nextThreadId) {
+      setMessages([])
+      return
     }
-  }, [messages])
+
+    setMessagesLoading(true)
+    try {
+      const rows = await getConversationMessages(nextThreadId, 800)
+      setMessages(rows.map((row) => toChatMessage(row)))
+    } finally {
+      setMessagesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    const bootstrap = async () => {
+      setConversationsLoading(true)
+      setError('')
+      try {
+        const items = await listConversations(200)
+        if (!active) {
+          return
+        }
+
+        setConversations(items)
+
+        const hasStoredThread = threadId && items.some((item) => item.threadId === threadId)
+        const initialThreadId = hasStoredThread ? threadId : items[0]?.threadId || ''
+
+        if (!initialThreadId) {
+          setThreadId('')
+          setMessages([])
+          return
+        }
+
+        setThreadId(initialThreadId)
+        setMessagesLoading(true)
+        const rows = await getConversationMessages(initialThreadId, 800)
+        if (!active) {
+          return
+        }
+        setMessages(rows.map((row) => toChatMessage(row)))
+      } catch (bootstrapError) {
+        if (!active) {
+          return
+        }
+        setError(bootstrapError instanceof Error ? bootstrapError.message : ZH_TEXT.conversationLoadFailed)
+      } finally {
+        if (!active) {
+          return
+        }
+        setConversationsLoading(false)
+        setMessagesLoading(false)
+      }
+    }
+
+    void bootstrap()
+    return () => {
+      active = false
+    }
+    // only bootstrap once with initial persisted thread id
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!settingsOpen) {
@@ -198,6 +181,66 @@ export function useChatApp(): UseChatAppResult {
 
     void mcpRefresh()
   }, [mcpRefresh, settingsOpen])
+
+  const createConversationAction = useCallback(async () => {
+    if (sending) {
+      return
+    }
+
+    try {
+      setError('')
+      const created = await createConversation()
+      setConversations((prev) => [created, ...prev.filter((item) => item.threadId !== created.threadId)])
+      setThreadId(created.threadId)
+      setMessages([])
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : ZH_TEXT.errUnknown)
+    }
+  }, [sending, setThreadId])
+
+  const selectConversation = useCallback(async (nextThreadId: string) => {
+    if (!nextThreadId || sending || nextThreadId === threadId) {
+      return
+    }
+
+    try {
+      setError('')
+      setThreadId(nextThreadId)
+      await loadThreadMessages(nextThreadId)
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : ZH_TEXT.errUnknown)
+    }
+  }, [loadThreadMessages, sending, setThreadId, threadId])
+
+  const deleteConversationAction = useCallback(async (targetThreadId: string) => {
+    if (!targetThreadId || sending) {
+      return
+    }
+
+    try {
+      setError('')
+      await deleteConversation(targetThreadId)
+
+      const remaining = sortedConversations.filter((item) => item.threadId !== targetThreadId)
+      setConversations(remaining)
+
+      if (threadId !== targetThreadId) {
+        return
+      }
+
+      const nextThreadId = remaining[0]?.threadId || ''
+      setThreadId(nextThreadId)
+      if (!nextThreadId) {
+        setMessages([])
+        return
+      }
+
+      await loadThreadMessages(nextThreadId)
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : ZH_TEXT.errUnknown)
+      return
+    }
+  }, [loadThreadMessages, sending, setThreadId, sortedConversations, threadId])
 
   const formatToolInputDetail = useCallback((input: unknown): string => {
     if (input === undefined || input === null) {
@@ -218,19 +261,31 @@ export function useChatApp(): UseChatAppResult {
       return
     }
 
+    setError('')
+
+    let activeThreadId = threadId
+    if (!activeThreadId) {
+      const created = await createConversation()
+      activeThreadId = created.threadId
+      setThreadId(activeThreadId)
+      setConversations((prev) => [created, ...prev.filter((item) => item.threadId !== created.threadId)])
+    }
+
     const userMessage: ChatMessage = {
       id: makeId('user'),
       role: 'user',
       content,
+      createdAt: Date.now(),
     }
     const assistantMessage: ChatMessage = {
       id: makeId('assistant'),
       role: 'assistant',
       content: '',
+      createdAt: Date.now(),
       toolTrace: createEmptyToolTrace(),
     }
-    const requestMessages = [...messages, userMessage]
-    const nextMessages = [...requestMessages, assistantMessage]
+
+    const nextMessages = [...messages, userMessage, assistantMessage]
 
     const updateAssistantMessage = (updater: (message: ChatMessage) => ChatMessage) => {
       setMessages((prev) => {
@@ -363,7 +418,6 @@ export function useChatApp(): UseChatAppResult {
 
     setMessages(nextMessages)
     setDraft('')
-    setError('')
     setSending(true)
     setStreamingMessageId(assistantMessage.id)
 
@@ -403,9 +457,10 @@ export function useChatApp(): UseChatAppResult {
     try {
       await requestAgentReplyStream({
         input: content,
-        threadId: threadId || null,
+        threadId: activeThreadId || null,
         onThreadId: (nextThreadId) => {
-          if (nextThreadId && nextThreadId !== threadId) {
+          if (nextThreadId && nextThreadId !== activeThreadId) {
+            activeThreadId = nextThreadId
             setThreadId(nextThreadId)
           }
         },
@@ -420,9 +475,13 @@ export function useChatApp(): UseChatAppResult {
         flushTimer = null
       }
       flushDelta()
+
+      const items = await refreshConversations()
+      if (activeThreadId && !items.some((item) => item.threadId === activeThreadId)) {
+        setThreadId(activeThreadId)
+      }
     } catch (requestError) {
       markRunningToolsError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
-
       setError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
       setMessages((prev) => {
         const last = prev[prev.length - 1]
@@ -443,22 +502,20 @@ export function useChatApp(): UseChatAppResult {
     draft,
     formatToolInputDetail,
     messages,
+    refreshConversations,
     sending,
     setThreadId,
     threadId,
   ])
 
   const clearConversation = useCallback(() => {
-    try {
-      window.localStorage.removeItem(CHAT_MESSAGES_STORAGE_KEY)
-      window.localStorage.removeItem(CHAT_THREAD_ID_STORAGE_KEY)
-    } catch {
-      // Ignore remove errors.
+    if (!threadId || sending) {
+      setMessages([])
+      return
     }
-    setMessages([])
-    setThreadId('')
-    setError('')
-  }, [setThreadId])
+
+    void deleteConversationAction(threadId)
+  }, [deleteConversationAction, sending, threadId])
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
@@ -474,6 +531,9 @@ export function useChatApp(): UseChatAppResult {
 
   return {
     theme,
+    conversations: sortedConversations,
+    conversationsLoading,
+    messagesLoading,
     messages,
     threadId,
     draft,
@@ -485,6 +545,9 @@ export function useChatApp(): UseChatAppResult {
     setDraft,
     sendMessage,
     clearConversation,
+    createConversation: createConversationAction,
+    selectConversation,
+    deleteConversation: deleteConversationAction,
     toggleTheme,
     toggleSettings,
     closeSettings,

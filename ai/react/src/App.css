@@ -1,6 +1,8 @@
 .app-shell {
+  --sidebar-width: 280px;
   height: 100dvh;
   position: relative;
+  display: flex;
   overflow: hidden;
 }
 
@@ -15,13 +17,13 @@
   background: var(--panel-bg);
   backdrop-filter: blur(14px);
   overflow-y: auto;
-  transform: translateX(-102%);
+  transform: translateX(calc(-100% - 12px));
   transition: transform 0.2s ease;
   z-index: 20;
 }
 
 .settings-open .settings-panel {
-  transform: translateX(0);
+  transform: translateX(var(--sidebar-width));
 }
 
 .panel-header {
@@ -90,16 +92,128 @@
 }
 
 .chat-main {
+  flex: 1;
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-left: 0;
-  transition: margin-left 0.2s ease;
 }
 
-.settings-open .chat-main {
-  margin-left: min(360px, 90vw);
+.conversation-sidebar {
+  width: var(--sidebar-width);
+  border-right: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow: hidden;
+}
+
+.new-conversation-button {
+  border: 1px solid color-mix(in srgb, #5f95ff 60%, var(--border-color));
+  background: color-mix(in srgb, #4f8dff 14%, var(--button-bg));
+  color: var(--text-main);
+  border-radius: 0.75rem;
+  padding: 0.62rem 0.72rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.new-conversation-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.conversation-sidebar-title {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.conversation-sidebar-empty {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 0.7rem;
+  padding: 0.6rem 0.65rem;
+}
+
+.conversation-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.5rem;
+  padding-right: 0.2rem;
+}
+
+.conversation-item {
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--button-bg);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  padding: 0.35rem;
+}
+
+.conversation-item.active {
+  border-color: color-mix(in srgb, #5f95ff 55%, var(--border-color));
+  background: color-mix(in srgb, #4f8dff 10%, var(--button-bg));
+}
+
+.conversation-item-main {
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.conversation-item-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.conversation-item-title {
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-item-preview {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-item-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.conversation-delete-button {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 0.58rem;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.15rem 0.45rem;
+  align-self: start;
+}
+
+.conversation-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .chat-header {
@@ -807,8 +921,20 @@
 }
 
 @media (max-width: 900px) {
-  .settings-open .chat-main {
-    margin-left: 0;
+  .app-shell {
+    --sidebar-width: 0px;
+  }
+
+  .conversation-sidebar {
+    display: none;
+  }
+
+  .settings-panel {
+    transform: translateX(calc(-100% - 12px));
+  }
+
+  .settings-open .settings-panel {
+    transform: translateX(0);
   }
 
   .chat-header {

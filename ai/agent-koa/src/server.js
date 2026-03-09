@@ -8,6 +8,7 @@ import { agentRouter } from './routes/agent.js';
 import { mcpAdminRouter } from './routes/mcpAdmin.js';
 import { openAICompatibleRouter } from './routes/openaiCompatible.js';
 import { rpcRouter } from './routes/rpc.js';
+import { threadsRouter } from './routes/threads.js';
 import { toolRouter } from './tooling/toolRouter.js';
 
 const app = express();
@@ -53,6 +54,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use(agentRouter);
+app.use(threadsRouter);
 app.use(openAICompatibleRouter);
 app.use(mcpAdminRouter);
 app.use(rpcRouter);

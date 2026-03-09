@@ -8,6 +8,7 @@ import { MessageMarkdown } from './MessageMarkdown'
 type MessageListProps = {
   messages: ChatMessage[]
   streamingMessageId: string | null
+  loading?: boolean
 }
 
 function hasTrace(trace: ChatMessageToolTrace | undefined): boolean {
@@ -103,6 +104,16 @@ export function MessageList(props: MessageListProps) {
       behavior: 'auto',
     })
   }, [rows, props.streamingMessageId])
+
+  if (props.loading) {
+    return (
+      <section className="chat-scroll">
+        <div className="empty-state">
+          <h3>{ZH_TEXT.loadingMessages}</h3>
+        </div>
+      </section>
+    )
+  }
 
   if (rows.length === 0) {
     return (

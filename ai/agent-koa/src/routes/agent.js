@@ -1,6 +1,7 @@
-锘縤mport { Router } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
+import { conversationStore } from '../persistence/conversations.js';
 import { endSSE, prepareSSE, sendSSEData } from '../utils/sse.js';
 
 const messageSchema = z.object({
@@ -35,7 +36,7 @@ const agentChatSchema = z
 
 function withSiteContext(input, siteContext) {
   if (!siteContext) return input;
-  return `${input}\n\n[宸ュ湴涓婁笅鏂嘳\n${JSON.stringify(siteContext, null, 2)}`;
+  return `${input}\n\n[工地上下文]\n${JSON.stringify(siteContext, null, 2)}`;
 }
 
 function resolveMessages(payload) {
@@ -51,6 +52,16 @@ function resolveMessages(payload) {
   ];
 }
 
+function extractLatestUserMessage(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') {
+      return messages[i];
+    }
+  }
+
+  return null;
+}
+
 export const agentRouter = Router();
 
 agentRouter.post('/agent/chat', async (req, res) => {
@@ -64,18 +75,22 @@ agentRouter.post('/agent/chat', async (req, res) => {
   }
 
   const payload = parsed.data;
-
-  // console.log('鎺ユ敹鍒板墠绔秷鎭細',payload);
-  
   const threadId = payload.thread_id || smartConstructionAgent.createThreadId();
   const messages = resolveMessages(payload);
+  const latestUserMessage = extractLatestUserMessage(messages);
 
   if (!payload.stream) {
+    if (latestUserMessage) {
+      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+    }
+
     const result = await smartConstructionAgent.run({
       threadId,
       messages,
       persistThread: true,
     });
+
+    conversationStore.appendMessage(threadId, 'assistant', result.text);
 
     res.json({
       thread_id: threadId,
@@ -93,6 +108,10 @@ agentRouter.post('/agent/chat', async (req, res) => {
   sendSSEData(res, { type: 'start', thread_id: threadId });
 
   try {
+    if (latestUserMessage) {
+      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+    }
+
     const result = await smartConstructionAgent.stream({
       threadId,
       messages,
@@ -122,6 +141,8 @@ agentRouter.post('/agent/chat', async (req, res) => {
         });
       },
     });
+
+    conversationStore.appendMessage(threadId, 'assistant', result.text);
 
     sendSSEData(res, {
       type: 'done',

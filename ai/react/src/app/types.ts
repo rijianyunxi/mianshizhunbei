@@ -6,6 +6,7 @@ export type ChatMessage = {
   role: Role
   content: string
   toolTrace?: ChatMessageToolTrace
+  createdAt?: number
 }
 
 export type ChatSettings = {
@@ -112,4 +113,21 @@ export type RpcCallResult = {
   text?: string
   raw?: unknown
   error?: string
+}
+
+export type ConversationSummary = {
+  threadId: string
+  title: string
+  createdAt: number
+  updatedAt: number
+  lastMessage: string
+  messageCount: number
+}
+
+export type ConversationMessage = {
+  id: number
+  threadId: string
+  role: Role
+  content: string
+  createdAt: number
 }

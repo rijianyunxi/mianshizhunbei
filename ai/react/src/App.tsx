@@ -1,6 +1,7 @@
 import './App.css'
 import { ChatComposer } from './components/ChatComposer'
 import { ChatHeader } from './components/ChatHeader'
+import { ConversationSidebar } from './components/ConversationSidebar'
 import { MessageList } from './components/MessageList'
 import { SettingsPanel } from './components/SettingsPanel'
 import { useChatApp } from './hooks/useChatApp'
@@ -10,6 +11,16 @@ function App() {
 
   return (
     <div className={`app-shell ${chat.settingsOpen ? 'settings-open' : ''}`}>
+      <ConversationSidebar
+        conversations={chat.conversations}
+        activeThreadId={chat.threadId}
+        loading={chat.conversationsLoading}
+        sending={chat.sending}
+        onCreate={chat.createConversation}
+        onSelect={chat.selectConversation}
+        onDelete={chat.deleteConversation}
+      />
+
       <SettingsPanel
         threadId={chat.threadId}
         mcp={chat.mcp}
@@ -25,7 +36,11 @@ function App() {
           onToggleSettings={chat.toggleSettings}
           onToggleTheme={chat.toggleTheme}
         />
-        <MessageList messages={chat.messages} streamingMessageId={chat.streamingMessageId} />
+        <MessageList
+          messages={chat.messages}
+          streamingMessageId={chat.streamingMessageId}
+          loading={chat.messagesLoading}
+        />
         {chat.error ? <div className="status-error">{chat.error}</div> : null}
         <ChatComposer
           value={chat.draft}

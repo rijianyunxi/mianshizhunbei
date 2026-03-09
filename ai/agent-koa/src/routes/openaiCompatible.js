@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { env } from '../config/env.js';
+import { conversationStore } from '../persistence/conversations.js';
 import { endSSE, prepareSSE } from '../utils/sse.js';
 
 const requestSchema = z.object({
@@ -29,6 +30,16 @@ function selectMessagesForThread(payload) {
   return payload.messages.slice(-1);
 }
 
+function extractLatestUserMessage(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') {
+      return messages[i];
+    }
+  }
+
+  return null;
+}
+
 export const openAICompatibleRouter = Router();
 
 openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
@@ -52,13 +63,22 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
   const threadId = payload.thread_id || undefined;
   const messages = selectMessagesForThread(payload);
   const persistThread = Boolean(threadId);
+  const latestUserMessage = extractLatestUserMessage(messages);
 
   if (!payload.stream) {
+    if (threadId && latestUserMessage) {
+      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+    }
+
     const result = await smartConstructionAgent.run({
       threadId,
       messages,
       persistThread,
     });
+
+    if (threadId) {
+      conversationStore.appendMessage(threadId, 'assistant', result.text);
+    }
 
     res.json({
       id,
@@ -93,7 +113,11 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
   );
 
   try {
-    await smartConstructionAgent.stream({
+    if (threadId && latestUserMessage) {
+      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+    }
+
+    const result = await smartConstructionAgent.stream({
       threadId,
       messages,
       persistThread,
@@ -109,6 +133,10 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
         );
       },
     });
+
+    if (threadId) {
+      conversationStore.appendMessage(threadId, 'assistant', result.text);
+    }
 
     res.write(
       `data: ${JSON.stringify({
