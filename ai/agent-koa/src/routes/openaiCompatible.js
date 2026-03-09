@@ -1,169 +1,139 @@
-import Router from '@koa/router';
+import { Router } from 'express';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
+import { env } from '../config/env.js';
 import { endSSE, prepareSSE } from '../utils/sse.js';
 
 const requestSchema = z.object({
-  sessionId: z.string().uuid().optional(),
-  model: z.string().trim().min(1).max(120).optional(),
   stream: z.boolean().optional().default(false),
+  thread_id: z.string().optional(),
   messages: z
     .array(
       z.object({
         role: z.enum(['system', 'user', 'assistant']),
-        content: z.string().max(12_000),
+        content: z.string(),
       }),
     )
-    .min(1)
-    .max(48),
+    .min(1),
 });
 
-function toErrorMessage(error) {
-  return error instanceof Error ? error.message : 'Unknown server error';
-}
+function selectMessagesForThread(payload) {
+  if (!payload.thread_id) return payload.messages;
 
-function canWrite(ctx) {
-  return Boolean(ctx?.res && !ctx.res.writableEnded && !ctx.res.destroyed);
-}
-
-function writeOpenAIChunk(ctx, data) {
-  if (!canWrite(ctx)) return false;
-  try {
-    ctx.res.write(`data: ${JSON.stringify(data)}\n\n`);
-    return true;
-  } catch {
-    return false;
+  for (let i = payload.messages.length - 1; i >= 0; i -= 1) {
+    if (payload.messages[i].role === 'user') {
+      return [payload.messages[i]];
+    }
   }
+
+  return payload.messages.slice(-1);
 }
 
-function writeOpenAIDone(ctx) {
-  if (!canWrite(ctx)) return;
-  ctx.res.write('data: [DONE]\n\n');
-}
+export const openAICompatibleRouter = Router();
 
-export const openAICompatibleRouter = new Router();
-
-openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
-  const parsed = requestSchema.safeParse(ctx.request.body);
+openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
+  const parsed = requestSchema.safeParse(req.body);
   if (!parsed.success) {
-    ctx.status = 400;
-    ctx.body = {
+    res.status(400).json({
       error: {
         message: 'Invalid request body',
         type: 'invalid_request_error',
         details: parsed.error.flatten(),
       },
-    };
+    });
     return;
   }
 
   const payload = parsed.data;
   const created = Math.floor(Date.now() / 1000);
   const id = `chatcmpl_${Date.now().toString(36)}`;
-  const model = payload.model ?? 'smart-construction-agent';
-  const persistSession = Boolean(payload.sessionId);
+  const model = env.OPENAI_MODEL;
+
+  const threadId = payload.thread_id || undefined;
+  const messages = selectMessagesForThread(payload);
+  const persistThread = Boolean(threadId);
 
   if (!payload.stream) {
-    try {
-      const result = await smartConstructionAgent.run({
-        sessionId: payload.sessionId,
-        persistSession,
-        model: payload.model,
-        messages: payload.messages,
-      });
+    const result = await smartConstructionAgent.run({
+      threadId,
+      messages,
+      persistThread,
+    });
 
-      ctx.body = {
-        id,
-        object: 'chat.completion',
-        created,
-        model,
-        choices: [
-          {
-            index: 0,
-            message: { role: 'assistant', content: result.text },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: {
-          prompt_tokens: null,
-          completion_tokens: null,
-          total_tokens: null,
+    res.json({
+      id,
+      object: 'chat.completion',
+      created,
+      model,
+      choices: [
+        {
+          index: 0,
+          message: { role: 'assistant', content: result.text },
+          finish_reason: 'stop',
         },
-      };
-      return;
-    } catch (error) {
-      console.error('[openai-compatible] non-stream failed', {
-        sessionId: payload.sessionId,
-        model: payload.model,
-        message: toErrorMessage(error),
-      });
-      ctx.status = 500;
-      ctx.body = {
-        error: {
-          message: toErrorMessage(error),
-          type: 'server_error',
-        },
-      };
-      return;
-    }
+      ],
+      usage: {
+        prompt_tokens: null,
+        completion_tokens: null,
+        total_tokens: null,
+      },
+    });
+    return;
   }
 
-  prepareSSE(ctx);
-  writeOpenAIChunk(ctx, {
-    id,
-    object: 'chat.completion.chunk',
-    created,
-    model,
-    choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
-  });
+  prepareSSE(res);
+  res.write(
+    `data: ${JSON.stringify({
+      id,
+      object: 'chat.completion.chunk',
+      created,
+      model,
+      choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
+    })}\n\n`,
+  );
 
   try {
     await smartConstructionAgent.stream({
-      sessionId: payload.sessionId,
-      persistSession,
-      model: payload.model,
-      messages: payload.messages,
+      threadId,
+      messages,
+      persistThread,
       onToken: (token) => {
-        writeOpenAIChunk(ctx, {
-          id,
-          object: 'chat.completion.chunk',
-          created,
-          model,
-          choices: [{ index: 0, delta: { content: token }, finish_reason: null }],
-        });
+        res.write(
+          `data: ${JSON.stringify({
+            id,
+            object: 'chat.completion.chunk',
+            created,
+            model,
+            choices: [{ index: 0, delta: { content: token }, finish_reason: null }],
+          })}\n\n`,
+        );
       },
     });
 
-    writeOpenAIChunk(ctx, {
-      id,
-      object: 'chat.completion.chunk',
-      created,
-      model,
-      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-    });
+    res.write(
+      `data: ${JSON.stringify({
+        id,
+        object: 'chat.completion.chunk',
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      })}\n\n`,
+    );
+    res.write('data: [DONE]\n\n');
   } catch (error) {
-    console.error('[openai-compatible] stream failed', {
-      sessionId: payload.sessionId,
-      model: payload.model,
-      message: toErrorMessage(error),
-    });
-
-    writeOpenAIChunk(ctx, {
-      error: {
-        message: toErrorMessage(error),
-        type: 'server_error',
-      },
-    });
-
-    writeOpenAIChunk(ctx, {
-      id,
-      object: 'chat.completion.chunk',
-      created,
-      model,
-      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-    });
-  } finally {
-    writeOpenAIDone(ctx);
-    endSSE(ctx);
+    const message = error instanceof Error ? error.message : String(error);
+    res.write(
+      `data: ${JSON.stringify({
+        id,
+        object: 'chat.completion.chunk',
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        error: { message },
+      })}\n\n`,
+    );
+    res.write('data: [DONE]\n\n');
   }
+
+  endSSE(res);
 });

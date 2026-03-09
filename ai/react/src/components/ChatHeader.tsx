@@ -1,9 +1,9 @@
-import { ZH_TEXT } from '../app/copy'
+﻿import { ZH_TEXT } from '../app/copy'
 import type { Theme } from '../app/types'
 import { SettingsIcon, ThemeIcon } from './icons'
 
 type ChatHeaderProps = {
-  modelName: string
+  threadId: string
   settingsOpen: boolean
   theme: Theme
   onToggleSettings: () => void
@@ -15,7 +15,8 @@ export function ChatHeader(props: ChatHeaderProps) {
     <header className="chat-header">
       <div>
         <h1>{ZH_TEXT.title}</h1>
-        <p>{props.modelName || ZH_TEXT.noModel}</p>
+        <p>{ZH_TEXT.backendManagedHint}</p>
+        <p className="thread-id">{props.threadId ? `thread: ${props.threadId}` : ZH_TEXT.noThread}</p>
       </div>
       <div className="header-actions">
         <button

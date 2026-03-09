@@ -1,26 +1,33 @@
 {
   "name": "agent-koa",
   "version": "1.0.0",
-  "description": "Koa + LangChainJS agent server for smart construction scenarios.",
+  "description": "Express + LangGraph + MCP agent server for smart construction scenarios.",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "chat": "node src/scripts/chatCli.js"
+    "chat": "node src/scripts/chatCli.js",
+    "mcp:demo": "node src/mcp/demoSmartSiteServer.js",
+    "mcp:test": "node src/mcp/hotSwapTestServer.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@koa/cors": "^5.0.0",
-    "@koa/router": "^15.3.1",
+    "@langchain/classic": "^1.0.22",
     "@langchain/core": "^1.1.31",
-    "@langchain/langgraph": "^0.2.68",
+    "@langchain/langgraph": "^1.2.1",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.1",
+    "@langchain/ollama": "^1.2.6",
     "@langchain/openai": "^1.2.12",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "better-sqlite3": "^12.6.2",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "koa": "^3.1.2",
-    "koa-bodyparser": "^4.4.1",
+    "express": "^5.2.1",
+    "langchain": "^1.2.30",
+    "morgan": "^1.10.1",
     "uuid": "^13.0.0",
     "zod": "^4.3.6"
   }

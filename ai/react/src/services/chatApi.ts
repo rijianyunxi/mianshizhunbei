@@ -1,30 +1,37 @@
-import { ZH_TEXT } from '../app/copy'
-import type { ChatMessage, ChatSettings } from '../app/types'
-import type { ChatProviderAdapter } from './provider'
-import { normalizeApiUrl } from '../utils/chat'
+﻿import { ZH_TEXT } from '../app/copy'
+import { BACKEND_API_TOKEN, BACKEND_BASE_URL } from '../app/config'
+import type { SelectedToolItem, ToolStreamInfo } from '../app/types'
 
-export function validateChatSettings(settings: ChatSettings): string | null {
-  if (!normalizeApiUrl(settings.apiUrl)) {
-    return ZH_TEXT.errApiUrlRequired
-  }
-  if (!settings.model.trim()) {
-    return ZH_TEXT.errModelRequired
-  }
-  if (!settings.apiKey.trim()) {
-    return ZH_TEXT.errApiKeyRequired
-  }
-  return null
-}
-
-type RequestAssistantReplyInput = {
-  settings: ChatSettings
-  messages: ChatMessage[]
-  provider: ChatProviderAdapter
-}
-
-type RequestAssistantReplyStreamInput = RequestAssistantReplyInput & {
+type RequestAssistantReplyStreamInput = {
+  input: string
+  threadId: string | null
+  onThreadId?: (threadId: string) => void
   onDelta: (delta: string) => void
+  onToolStart?: (tool: ToolStreamInfo) => void
+  onToolEnd?: (tool: ToolStreamInfo) => void
+  onSelectedTools?: (tools: SelectedToolItem[]) => void
 }
+
+type AgentStreamSelectedTool = {
+  key?: unknown
+  server_id?: unknown
+  name?: unknown
+}
+
+type AgentStreamEvent = {
+  type?: string
+  thread_id?: string
+  delta?: string
+  tool?: string
+  runtime_name?: string
+  server_id?: string
+  tool_name?: string
+  tool_input?: unknown
+  selected_tools?: AgentStreamSelectedTool[]
+  error?: string
+}
+
+type StreamEventHandlers = RequestAssistantReplyStreamInput
 
 function parseSSEEventData(rawEvent: string): string | null {
   const lines = rawEvent.split(/\r?\n/)
@@ -42,35 +49,113 @@ function parseSSEEventData(rawEvent: string): string | null {
   return dataLines.join('\n')
 }
 
-export async function requestAssistantReply(input: RequestAssistantReplyInput): Promise<string> {
-  const endpoint = input.provider.buildEndpoint(normalizeApiUrl(input.settings.apiUrl))
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${input.settings.apiKey.trim()}`,
-    },
-    body: JSON.stringify(input.provider.buildPayload(input.settings, input.messages, { stream: false })),
-  })
-
-  if (!response.ok) {
-    const details = await response.text()
-    throw new Error(`${ZH_TEXT.errRequestFailed} (${response.status}): ${details || response.statusText}`)
+function buildHeaders(apiToken: string): HeadersInit {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
   }
 
-  const payload = (await response.json()) as unknown
-  return input.provider.parseText(payload)
+  if (apiToken) {
+    headers.Authorization = `Bearer ${apiToken}`
+  }
+
+  return headers
 }
 
-export async function requestAssistantReplyStream(input: RequestAssistantReplyStreamInput): Promise<void> {
-  const endpoint = input.provider.buildEndpoint(normalizeApiUrl(input.settings.apiUrl))
-  const response = await fetch(endpoint, {
+function normalizeSelectedTools(input: unknown): SelectedToolItem[] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const tools: SelectedToolItem[] = []
+  for (const row of input) {
+    if (!row || typeof row !== 'object') {
+      continue
+    }
+
+    const item = row as AgentStreamSelectedTool
+    const key = typeof item.key === 'string' ? item.key.trim() : ''
+    const serverId = typeof item.server_id === 'string' ? item.server_id.trim() : ''
+    const name = typeof item.name === 'string' ? item.name.trim() : ''
+    if (!key || !serverId || !name) {
+      continue
+    }
+
+    tools.push({
+      key,
+      serverId,
+      name,
+    })
+  }
+
+  return tools
+}
+
+function normalizeToolStreamInfo(event: AgentStreamEvent): ToolStreamInfo | null {
+  const displayName = typeof event.tool === 'string' ? event.tool.trim() : ''
+  const runtimeName = typeof event.runtime_name === 'string' ? event.runtime_name.trim() : ''
+  const serverId = typeof event.server_id === 'string' ? event.server_id.trim() : ''
+  const toolName = typeof event.tool_name === 'string' ? event.tool_name.trim() : ''
+
+  if (!displayName) {
+    return null
+  }
+
+  return {
+    displayName,
+    runtimeName: runtimeName || displayName,
+    serverId: serverId || 'unknown',
+    toolName: toolName || displayName,
+    input: event.tool_input,
+  }
+}
+
+function handleAgentEvent(event: AgentStreamEvent, handlers: StreamEventHandlers): void {
+  if (typeof event.thread_id === 'string' && event.thread_id.trim()) {
+    handlers.onThreadId?.(event.thread_id)
+  }
+
+  switch (event.type) {
+    case 'delta': {
+      if (typeof event.delta === 'string' && event.delta) {
+        handlers.onDelta(event.delta)
+      }
+      return
+    }
+    case 'tool_start': {
+      const toolInfo = normalizeToolStreamInfo(event)
+      if (toolInfo) {
+        handlers.onToolStart?.(toolInfo)
+      }
+      return
+    }
+    case 'tool_end': {
+      const toolInfo = normalizeToolStreamInfo(event)
+      if (toolInfo) {
+        handlers.onToolEnd?.(toolInfo)
+      }
+      return
+    }
+    case 'done': {
+      handlers.onSelectedTools?.(normalizeSelectedTools(event.selected_tools))
+      return
+    }
+    case 'error': {
+      throw new Error(event.error || ZH_TEXT.errUnknown)
+    }
+    default:
+      return
+  }
+}
+
+export async function requestAgentReplyStream(input: RequestAssistantReplyStreamInput): Promise<void> {
+  const response = await fetch(`${BACKEND_BASE_URL}/agent/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${input.settings.apiKey.trim()}`,
-    },
-    body: JSON.stringify(input.provider.buildPayload(input.settings, input.messages, { stream: true })),
+    headers: buildHeaders(BACKEND_API_TOKEN),
+    body: JSON.stringify({
+      thread_id: input.threadId || undefined,
+      input: input.input,
+      stream: true,
+    }),
   })
 
   if (!response.ok) {
@@ -88,13 +173,11 @@ export async function requestAssistantReplyStream(input: RequestAssistantReplySt
 
   while (true) {
     const { done, value } = await reader.read()
-    
     if (done) {
       break
     }
 
     buffer += decoder.decode(value, { stream: true })
-
 
     while (true) {
       const boundary = /\r?\n\r?\n/.exec(buffer)
@@ -115,23 +198,19 @@ export async function requestAssistantReplyStream(input: RequestAssistantReplySt
       }
 
       try {
-        const payload = JSON.parse(eventData) as unknown
-        const delta = input.provider.parseStreamDelta(payload)
-        if (delta) {
-          input.onDelta(delta)
-
-          console.log(111,delta);
-
+        const event = JSON.parse(eventData) as AgentStreamEvent
+        handleAgentEvent(event, input)
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error
         }
-      } catch {
-        // Ignore partial or malformed SSE data segments.
       }
     }
   }
 
-  const lastChunk = decoder.decode()
-  if (lastChunk) {
-    buffer += lastChunk
+  const tail = decoder.decode()
+  if (tail) {
+    buffer += tail
   }
 
   const remaining = buffer.trim()
@@ -140,26 +219,10 @@ export async function requestAssistantReplyStream(input: RequestAssistantReplySt
   }
 
   const eventData = parseSSEEventData(remaining)
-  if (eventData && eventData !== '[DONE]') {
-    try {
-      const payload = JSON.parse(eventData) as unknown
-      const delta = input.provider.parseStreamDelta(payload)
-      if (delta) {
-        input.onDelta(delta)
-      }
-      return
-    } catch {
-      // Fallback to raw JSON parse below.
-    }
+  if (!eventData || eventData === '[DONE]') {
+    return
   }
 
-  try {
-    const payload = JSON.parse(remaining) as unknown
-    const text = input.provider.parseText(payload)
-    if (text) {
-      input.onDelta(text)
-    }
-  } catch {
-    // Ignore tail noise when stream is already closed.
-  }
+  const event = JSON.parse(eventData) as AgentStreamEvent
+  handleAgentEvent(event, input)
 }

@@ -11,18 +11,15 @@ function App() {
   return (
     <div className={`app-shell ${chat.settingsOpen ? 'settings-open' : ''}`}>
       <SettingsPanel
-        settings={chat.settings}
-        modelSelectValue={chat.modelSelectValue}
-        customModelMode={chat.customModelMode}
+        threadId={chat.threadId}
+        mcp={chat.mcp}
         onClose={chat.closeSettings}
-        onModelSelect={chat.selectModel}
-        onUpdateSettings={chat.updateSettings}
         onClearConversation={chat.clearConversation}
       />
 
       <main className="chat-main">
         <ChatHeader
-          modelName={chat.settings.model}
+          threadId={chat.threadId}
           settingsOpen={chat.settingsOpen}
           theme={chat.theme}
           onToggleSettings={chat.toggleSettings}

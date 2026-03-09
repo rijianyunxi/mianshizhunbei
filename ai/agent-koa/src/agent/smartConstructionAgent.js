@@ -1,428 +1,339 @@
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
+﻿import { DynamicStructuredTool } from '@langchain/core/tools';
+import { createAgent } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { createSmartSiteTools } from '../tools/smartSiteTools.js';
+import { mcpRegistry } from '../mcp/mcpRegistry.js';
+import { checkpointSaver } from '../persistence/checkpointer.js';
+import { toolRouter } from '../tooling/toolRouter.js';
+import { jsonSchemaToZod, normalizeRole, splitText } from '../utils/schema.js';
 
 const AGENT_SYSTEM_PROMPT = [
-  '你是“智慧工地 AI 助手”。',
-  '目标：',
-  '1. 优先保证施工安全与合规。',
-  '2. 回答必须可执行，给出步骤、检查点和落地建议。',
-  '3. 问题涉及风险评估、作业许可、班前检查、高风险工种时，优先调用工具。',
-  '4. 默认输出简体中文，简洁清晰。',
+  '你是“智慧工地 AI 调度助手”。',
+  '你的任务：',
+  '1. 优先保证施工安全和合规。',
+  '2. 输出结构化、可执行的步骤和检查项。',
+  '3. 必要时主动调用工具，不要凭空编造现场数据。',
+  '4. 默认使用简体中文，表达简洁清晰。',
+  '5. 工具调用遵循“能力感知 + 按需最小化”原则：仅在当前已启用工具能直接解决问题时调用对应工具。',
+  '6. 若用户请求涉及外部操作（如网页、设备、数据系统），先判断是否存在匹配工具；有则执行，无则明确说明缺失能力并给出替代方案。',
 ].join('\n');
 
-const MODEL_CACHE_LIMIT = 8;
-const AGENT_CACHE_LIMIT = 8;
-const STREAM_FALLBACK_CHUNK_SIZE = 20;
-
-const agentMessageSchema = z.object({
+const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
-  content: z.string().max(12_000),
+  content: z.string().min(1).max(20000),
 });
 
-const agentInputSchema = z.object({
-  model: z.string().trim().min(1).max(120).optional(),
-  messages: z.array(agentMessageSchema).min(1).max(48),
-  sessionId: z.string().uuid().optional(),
-  persistSession: z.boolean().optional().default(false),
+const inputSchema = z.object({
+  threadId: z.string().optional(),
+  messages: z.array(messageSchema).min(1),
+  persistThread: z.boolean().optional().default(true),
 });
+
+function withTimeout(promise, timeoutMs, label) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`工具调用超时(${timeoutMs}ms): ${label}`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== null) clearTimeout(timer);
+  });
+}
 
 function contentToText(content) {
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object' && 'text' in item && typeof item.text === 'string') {
-          return item.text;
-        }
-        return '';
-      })
-      .join('');
-  }
-  return '';
-}
-
-function splitForSSE(text, maxChunk = 28) {
-  const chunks = [];
-  let current = '';
-  for (const char of text) {
-    current += char;
-    if (current.length >= maxChunk) {
-      chunks.push(current);
-      current = '';
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-function mapChatMessagesToLangChain(messages) {
-  return messages.map((message) => {
-    if (message.role === 'assistant') return new AIMessage(message.content);
-    if (message.role === 'system') return new SystemMessage(message.content);
-    return new HumanMessage(message.content);
-  });
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object' && typeof item.text === 'string') return item.text;
+      return '';
+    })
+    .join('');
 }
 
 function extractFinalAssistantText(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    const role =
+      typeof msg?.getType === 'function'
+        ? msg.getType()
+        : typeof msg?._getType === 'function'
+          ? msg._getType()
+          : msg?.role;
+
+    if (role === 'ai' || role === 'assistant') {
+      const text = contentToText(msg?.content).trim();
+      if (text) return text;
+    }
+  }
+  return '';
+}
+
+function extractLatestUserQuery(messages) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
-
-    if (message instanceof AIMessage) {
-      const text = contentToText(message.content).trim();
-      if (text) return text;
-      continue;
-    }
-
-    if (
-      message &&
-      typeof message === 'object' &&
-      'role' in message &&
-      message.role === 'assistant' &&
-      'content' in message
-    ) {
-      const text = contentToText(message.content).trim();
-      if (text) return text;
+    if (message.role === 'user') {
+      return message.content;
     }
   }
   return '';
 }
 
-function extractTokenFromChunk(chunk) {
-  if (typeof chunk === 'string') return chunk;
-  if (Array.isArray(chunk)) return contentToText(chunk);
-  if (!chunk || typeof chunk !== 'object') return '';
+function buildSlidingWindow(messages) {
+  const normalized = messages.map((message) => ({
+    role: normalizeRole(message.role),
+    content: String(message.content || '').trim(),
+  }));
 
-  if ('content' in chunk) return contentToText(chunk.content);
-  if ('text' in chunk && typeof chunk.text === 'string') return chunk.text;
-  return '';
+  const firstSystem = normalized.find((message) => message.role === 'system');
+  const nonSystem = normalized.filter((message) => message.role !== 'system');
+  const keepCount = Math.max(2, env.AGENT_CONTEXT_ROUNDS * 2);
+  const recent = nonSystem.slice(-keepCount);
+
+  const systemMessage = firstSystem || { role: 'system', content: AGENT_SYSTEM_PROMPT };
+  return [systemMessage, ...recent];
 }
 
-function extractTokenFromLangGraphEvent(event) {
-  if (!event || typeof event !== 'object') return '';
-
-  const eventName = typeof event.event === 'string' ? event.event : '';
-  if (eventName !== 'on_chat_model_stream' && eventName !== 'on_llm_stream') return '';
-
-  const data = event.data && typeof event.data === 'object' ? event.data : {};
-  const candidates = [data.chunk, data.delta, data.output, data.message, data];
-
-  for (const candidate of candidates) {
-    const token = extractTokenFromChunk(candidate);
-    if (token) return token;
-  }
-
-  return '';
-}
-
-function extractTokenFromMessageStreamChunk(chunk) {
-  const message = Array.isArray(chunk) ? chunk[0] : chunk;
-  if (!message || typeof message !== 'object') return '';
-
-  if ('type' in message && typeof message.type === 'string' && !message.type.toLowerCase().includes('ai')) {
-    return '';
-  }
-
-  if ('tool_calls' in message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
-    return '';
-  }
-
-  if ('content' in message) {
-    return contentToText(message.content);
-  }
-
-  return '';
-}
-
-function getErrorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function logAgentError(stage, error, meta = {}) {
-  const stack = error instanceof Error ? error.stack : undefined;
-  console.error(`[smart-agent] ${stage}: ${getErrorMessage(error)}`, { ...meta, stack });
-}
-
-function touchCacheEntry(cache, key, value, limit) {
-  if (cache.has(key)) {
-    cache.delete(key);
-  }
-  cache.set(key, value);
-  if (cache.size > limit) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
-    }
-  }
-  return value;
-}
-
-function parseAgentInput(rawInput) {
-  const parsed = agentInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    const details = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    throw new Error(`Invalid agent input: ${details}`);
-  }
-
-  const input = parsed.data;
-  const hasUserMessage = input.messages.some(
-    (message) => message.role === 'user' && message.content.trim().length > 0,
-  );
-
-  if (!hasUserMessage) {
-    throw new Error('Invalid agent input: at least one non-empty user message is required.');
-  }
-
-  return input;
-}
-
-class ConversationMemoryStore {
-  constructor(maxHistory) {
-    this.maxHistory = maxHistory;
-    this.store = new Map();
-  }
-
-  get(sessionId) {
-    return this.store.get(sessionId) ?? [];
-  }
-
-  append(sessionId, message) {
-    const next = [...this.get(sessionId), message];
-    const sliced = next.slice(-this.maxHistory);
-    this.store.set(sessionId, sliced);
-    return sliced;
-  }
-}
-
-function createChatModel(modelName) {
-  const hasCustomBaseURL = Boolean(env.OPENAI_BASE_URL);
+function createModel() {
+  const hasCustomBaseUrl = Boolean(env.OPENAI_BASE_URL);
   return new ChatOpenAI({
-    model: modelName || env.OPENAI_MODEL,
-    apiKey: env.OPENAI_API_KEY || (hasCustomBaseURL ? 'ollama' : ''),
-    configuration: hasCustomBaseURL ? { baseURL: env.OPENAI_BASE_URL } : undefined,
-    temperature: 0,
+    model: env.OPENAI_MODEL,
+    apiKey: env.OPENAI_API_KEY || (hasCustomBaseUrl ? 'sk-local' : ''),
+    configuration: hasCustomBaseUrl ? { baseURL: env.OPENAI_BASE_URL } : undefined,
+    temperature: 0.2,
   });
 }
 
-export class SmartConstructionAgentService {
-  constructor() {
-    this.tools = createSmartSiteTools();
-    this.memory = new ConversationMemoryStore(env.AGENT_MAX_HISTORY);
-    this.modelCache = new Map();
-    this.agentCache = new Map();
+function extractToolNameFromEvent(event) {
+  const candidates = [event?.name, event?.data?.name, event?.data?.tool?.name, event?.data?.input?.name];
+  for (const item of candidates) {
+    if (typeof item === 'string' && item.trim()) return item;
+  }
+  return 'unknown_tool';
+}
+
+function buildToolEventPayload(event, selectedTools) {
+  const runtimeName = extractToolNameFromEvent(event);
+  const descriptor = selectedTools.find((item) => item.runtimeName === runtimeName);
+
+  return {
+    name: descriptor ? `${descriptor.serverId}/${descriptor.name}` : runtimeName,
+    runtimeName,
+    serverId: descriptor?.serverId,
+    toolName: descriptor?.name || runtimeName,
+    input: event?.data?.input,
+  };
+}
+
+function extractTokenFromEvent(event) {
+  const eventName = String(event?.event || '');
+  if (eventName !== 'on_chat_model_stream' && eventName !== 'on_llm_stream') {
+    return '';
   }
 
-  createSessionId() {
+  const candidates = [event?.data?.chunk, event?.data?.delta, event?.data?.output, event?.data?.message];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (typeof candidate === 'string') return candidate;
+    const text = contentToText(candidate?.content);
+    if (text) return text;
+  }
+
+  return '';
+}
+
+export class SmartConstructionAgentService {
+  createThreadId() {
     return uuidv4();
   }
 
-  getSessionHistory(sessionId) {
-    return this.memory.get(sessionId);
-  }
-
-  appendSessionMessage(sessionId, message) {
-    return this.memory.append(sessionId, message);
-  }
-
-  resolveModelName(modelName) {
-    return modelName?.trim() || env.OPENAI_MODEL;
-  }
-
-  getOrCreateChatModel(modelName) {
-    const resolvedModel = this.resolveModelName(modelName);
-    const cached = this.modelCache.get(resolvedModel);
-    if (cached) {
-      touchCacheEntry(this.modelCache, resolvedModel, cached, MODEL_CACHE_LIMIT);
-      return cached;
+  validateOrThrow(rawInput) {
+    const parsed = inputSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      const details = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+      throw new Error(`Invalid agent input: ${details}`);
     }
 
-    const created = createChatModel(resolvedModel);
-    return touchCacheEntry(this.modelCache, resolvedModel, created, MODEL_CACHE_LIMIT);
-  }
-
-  getOrCreateRuntimeAgent(modelName) {
-    const resolvedModel = this.resolveModelName(modelName);
-    const cached = this.agentCache.get(resolvedModel);
-    if (cached) {
-      touchCacheEntry(this.agentCache, resolvedModel, cached, AGENT_CACHE_LIMIT);
-      return cached;
+    const hasUser = parsed.data.messages.some((message) => message.role === 'user' && message.content.trim());
+    if (!hasUser) {
+      throw new Error('Invalid agent input: at least one user message is required.');
     }
 
-    const created = createReactAgent({
-      llm: this.getOrCreateChatModel(resolvedModel),
-      tools: this.tools,
-      prompt: AGENT_SYSTEM_PROMPT,
-    });
-
-    return touchCacheEntry(this.agentCache, resolvedModel, created, AGENT_CACHE_LIMIT);
+    return parsed.data;
   }
 
-  resolveMessages(input) {
-    if (!input.persistSession || !input.sessionId) {
-      return input.messages;
-    }
+  async buildRuntime(rawInput) {
+    const input = this.validateOrThrow(rawInput);
 
-    const history = this.memory.get(input.sessionId);
-    return history.length > 0 ? [...history, ...input.messages] : input.messages;
-  }
-
-  persistConversationTurn(input, assistantText) {
-    if (!input.persistSession || !input.sessionId) return;
-
-    for (const message of input.messages) {
-      if (message.role !== 'user') continue;
-      this.memory.append(input.sessionId, {
-        role: 'user',
-        content: message.content,
-      });
-    }
-
-    this.memory.append(input.sessionId, {
-      role: 'assistant',
-      content: assistantText,
-    });
-  }
-
-  async generateReply(agent, messages) {
-    const result = await agent.invoke({ messages });
-    const text = extractFinalAssistantText(result.messages ?? []);
-    return text || '未生成有效回复，请重试。';
-  }
-
-  async streamByEvents(agent, messages, onToken) {
-    if (typeof agent.streamEvents !== 'function') {
-      return { text: '', tokenCount: 0 };
-    }
-
-    const eventStream = await agent.streamEvents({ messages }, { version: 'v2' });
-    let output = '';
-    let tokenCount = 0;
-
-    for await (const event of eventStream) {
-      const token = extractTokenFromLangGraphEvent(event);
-      if (!token) continue;
-      tokenCount += 1;
-      output += token;
-      if (onToken) onToken(token);
-    }
-
-    return { text: output, tokenCount };
-  }
-
-  async streamByMessagesMode(agent, messages, onToken) {
-    if (typeof agent.stream !== 'function') {
-      return { text: '', tokenCount: 0 };
-    }
-
-    const messageStream = await agent.stream({ messages }, { streamMode: 'messages' });
-    let output = '';
-    let tokenCount = 0;
-
-    for await (const chunk of messageStream) {
-      const token = extractTokenFromMessageStreamChunk(chunk);
-      if (!token) continue;
-      tokenCount += 1;
-      output += token;
-      if (onToken) onToken(token);
-    }
-
-    return { text: output, tokenCount };
-  }
-
-  async run(rawInput) {
     if (!env.OPENAI_API_KEY && !env.OPENAI_BASE_URL) {
       return {
-        text: '服务已启动，但未配置 OPENAI_API_KEY，且 OPENAI_BASE_URL 为空，请在 .env 中至少配置其一后重试。',
+        input,
+        errorText: '服务已启动，但未配置 OPENAI_API_KEY 且 OPENAI_BASE_URL 为空，请至少配置其中一个。',
       };
     }
 
-    const input = parseAgentInput(rawInput);
+    const query = extractLatestUserQuery(input.messages);
+    const selectedTools = await toolRouter.selectTools(query, env.TOOL_ROUTER_TOP_K);
 
-    try {
-      const agent = this.getOrCreateRuntimeAgent(input.model);
-      const messages = mapChatMessagesToLangChain(this.resolveMessages(input));
-      const text = await this.generateReply(agent, messages);
-      this.persistConversationTurn(input, text);
-      return { text };
-    } catch (error) {
-      logAgentError('run-failed', error, {
-        sessionId: input.sessionId,
-        model: this.resolveModelName(input.model),
+    const tools = selectedTools.map((descriptor) => {
+      const schema = jsonSchemaToZod(descriptor.inputSchema);
+      return new DynamicStructuredTool({
+        name: descriptor.runtimeName,
+        description: `[MCP/${descriptor.serverId}/${descriptor.name}] ${descriptor.description || 'No description'}`,
+        schema,
+        func: async (args) => {
+          try {
+            const label = `${descriptor.serverId}/${descriptor.name}`;
+            const result = await withTimeout(
+              mcpRegistry.callTool(descriptor.serverId, descriptor.name, args || {}),
+              env.AGENT_TOOL_TIMEOUT_MS,
+              label,
+            );
+            return result.text;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return `工具调用失败(${descriptor.serverId}/${descriptor.name}): ${message}`;
+          }
+        },
       });
-      throw error;
+    });
+
+    const agent = createAgent({
+      model: createModel(),
+      tools,
+      systemPrompt: AGENT_SYSTEM_PROMPT,
+      checkpointer: input.persistThread && input.threadId ? checkpointSaver : undefined,
+    });
+
+    const messages = buildSlidingWindow(input.messages);
+    const config = {
+      recursionLimit: env.AGENT_MAX_ITERATIONS,
+      configurable: input.persistThread && input.threadId ? { thread_id: input.threadId } : undefined,
+    };
+
+    return {
+      input,
+      agent,
+      config,
+      messages,
+      selectedTools,
+    };
+  }
+
+  async run(rawInput) {
+    const runtime = await this.buildRuntime(rawInput);
+    if (runtime.errorText) {
+      return {
+        text: runtime.errorText,
+        selectedTools: [],
+      };
     }
+
+    const result = await runtime.agent.invoke({ messages: runtime.messages }, runtime.config);
+    const text = extractFinalAssistantText(result?.messages) || '未生成有效回复，请重试。';
+
+    return {
+      text,
+      selectedTools: runtime.selectedTools,
+    };
   }
 
   async stream(rawInput) {
-    if (!env.OPENAI_API_KEY && !env.OPENAI_BASE_URL) {
-      const text =
-        '服务已启动，但未配置 OPENAI_API_KEY，且 OPENAI_BASE_URL 为空，请在 .env 中至少配置其一后重试。';
-      if (typeof rawInput?.onToken === 'function') {
-        for (const part of splitForSSE(text, STREAM_FALLBACK_CHUNK_SIZE)) rawInput.onToken(part);
-      }
-      return { text };
-    }
-
-    if (rawInput?.onToken && typeof rawInput.onToken !== 'function') {
-      throw new Error('Invalid agent input: onToken must be a function when provided.');
-    }
-
     const onToken = typeof rawInput?.onToken === 'function' ? rawInput.onToken : undefined;
-    const input = parseAgentInput(rawInput);
+    const onToolStart = typeof rawInput?.onToolStart === 'function' ? rawInput.onToolStart : undefined;
+    const onToolEnd = typeof rawInput?.onToolEnd === 'function' ? rawInput.onToolEnd : undefined;
 
-    try {
-      const agent = this.getOrCreateRuntimeAgent(input.model);
-      const messages = mapChatMessagesToLangChain(this.resolveMessages(input));
-
-      try {
-        const eventResult = await this.streamByEvents(agent, messages, onToken);
-        if (eventResult.tokenCount > 0) {
-          const text = eventResult.text.trim();
-          this.persistConversationTurn(input, text);
-          return { text };
-        }
-      } catch (error) {
-        logAgentError('stream-events-failed', error, {
-          sessionId: input.sessionId,
-          model: this.resolveModelName(input.model),
-        });
-      }
-
-      try {
-        const messageStreamResult = await this.streamByMessagesMode(agent, messages, onToken);
-        if (messageStreamResult.tokenCount > 0) {
-          const text = messageStreamResult.text.trim();
-          this.persistConversationTurn(input, text);
-          return { text };
-        }
-      } catch (error) {
-        logAgentError('stream-messages-failed', error, {
-          sessionId: input.sessionId,
-          model: this.resolveModelName(input.model),
-        });
-      }
-
-      const text = await this.generateReply(agent, messages);
+    const runtime = await this.buildRuntime(rawInput);
+ 
+    if (runtime.errorText) {
       if (onToken) {
-        for (const part of splitForSSE(text, STREAM_FALLBACK_CHUNK_SIZE)) {
-          onToken(part);
+        for (const part of splitText(runtime.errorText, 20)) onToken(part);
+      }
+      return {
+        text: runtime.errorText,
+        selectedTools: [],
+      };
+    }
+
+    const controller = new AbortController();
+    const config = {
+      ...runtime.config,
+      signal: controller.signal,
+      version: 'v2',
+    };
+
+    let output = '';
+    let tokenCount = 0;
+    let toolCallCount = 0;
+    let activeToolCalls = 0;
+    let finalTextFromEvents = '';
+
+    const stream = await runtime.agent.streamEvents({ messages: runtime.messages }, config);
+
+    for await (const event of stream) {
+      const eventName = String(event?.event || '');
+
+      if (eventName === 'on_tool_start') {
+        toolCallCount += 1;
+        activeToolCalls += 1;
+        const toolEvent = buildToolEventPayload(event, runtime.selectedTools);
+        if (onToolStart) onToolStart(toolEvent);
+
+        if (toolCallCount > env.AGENT_TOOL_MAX_CALLS) {
+          controller.abort();
+          throw new Error(`Tool call limit exceeded: ${env.AGENT_TOOL_MAX_CALLS}`);
         }
       }
 
-      this.persistConversationTurn(input, text);
-      return { text };
-    } catch (error) {
-      logAgentError('stream-failed', error, {
-        sessionId: input.sessionId,
-        model: this.resolveModelName(input.model),
-      });
-      throw error;
+      if (eventName === 'on_tool_end') {
+        activeToolCalls = Math.max(0, activeToolCalls - 1);
+        const toolEvent = buildToolEventPayload(event, runtime.selectedTools);
+        if (onToolEnd) onToolEnd(toolEvent);
+      }
+
+      if (eventName === 'on_chain_end') {
+        const maybeMessages = event?.data?.output?.messages;
+        const maybeText = extractFinalAssistantText(maybeMessages);
+        if (maybeText) {
+          finalTextFromEvents = maybeText;
+        }
+      }
+
+      if (activeToolCalls > 0 && (eventName === 'on_chat_model_stream' || eventName === 'on_llm_stream')) {
+        continue;
+      }
+
+      const token = extractTokenFromEvent(event);
+      if (!token) continue;
+      tokenCount += 1;
+      output += token;
+      if (onToken) onToken(token);
     }
+
+    if (tokenCount > 0) {
+      return {
+        text: output.trim(),
+        selectedTools: runtime.selectedTools,
+      };
+    }
+
+    if (finalTextFromEvents) {
+      if (onToken) {
+        for (const part of splitText(finalTextFromEvents, 20)) onToken(part);
+      }
+      return {
+        text: finalTextFromEvents,
+        selectedTools: runtime.selectedTools,
+      };
+    }
+
+    throw new Error('模型响应流中断：未接收到有效内容。');
   }
 }
 

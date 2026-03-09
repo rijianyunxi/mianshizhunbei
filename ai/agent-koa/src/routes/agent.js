@@ -1,109 +1,141 @@
-import Router from '@koa/router';
+﻿import { Router } from 'express';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { endSSE, prepareSSE, sendSSEData } from '../utils/sse.js';
 
-const agentChatSchema = z.object({
-  sessionId: z.string().uuid().optional(),
-  input: z.string().trim().min(1).max(4000),
-  stream: z.boolean().optional().default(false),
-  model: z.string().trim().min(1).max(120).optional(),
-  siteContext: z
-    .object({
-      projectName: z.string().max(200).optional(),
-      city: z.string().max(100).optional(),
-      weather: z.string().max(200).optional(),
-      operationType: z.string().max(200).optional(),
-      shift: z.enum(['day', 'night']).optional(),
-    })
-    .optional(),
+const messageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string().min(1),
 });
+
+const agentChatSchema = z
+  .object({
+    thread_id: z.string().optional(),
+    input: z.string().min(1).optional(),
+    messages: z.array(messageSchema).optional(),
+    stream: z.boolean().optional().default(false),
+    siteContext: z
+      .object({
+        projectName: z.string().optional(),
+        city: z.string().optional(),
+        weather: z.string().optional(),
+        operationType: z.string().optional(),
+        shift: z.enum(['day', 'night']).optional(),
+      })
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if ((!value.input || !value.input.trim()) && (!value.messages || value.messages.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either input or messages is required',
+      });
+    }
+  });
 
 function withSiteContext(input, siteContext) {
   if (!siteContext) return input;
   return `${input}\n\n[工地上下文]\n${JSON.stringify(siteContext, null, 2)}`;
 }
 
-function toErrorMessage(error) {
-  return error instanceof Error ? error.message : 'Unknown server error';
+function resolveMessages(payload) {
+  if (payload.messages && payload.messages.length > 0) {
+    return payload.messages;
+  }
+
+  return [
+    {
+      role: 'user',
+      content: withSiteContext(payload.input || '', payload.siteContext),
+    },
+  ];
 }
 
-export const agentRouter = new Router();
+export const agentRouter = Router();
 
-agentRouter.post('/agent/chat', async (ctx) => {
-  const parsed = agentChatSchema.safeParse(ctx.request.body);
+agentRouter.post('/agent/chat', async (req, res) => {
+  const parsed = agentChatSchema.safeParse(req.body);
   if (!parsed.success) {
-    ctx.status = 400;
-    ctx.body = {
+    res.status(400).json({
       error: 'Invalid request body',
       details: parsed.error.flatten(),
-    };
+    });
     return;
   }
 
   const payload = parsed.data;
-  const sessionId = payload.sessionId ?? smartConstructionAgent.createSessionId();
-  const userInput = withSiteContext(payload.input, payload.siteContext);
-  const messages = [{ role: 'user', content: userInput }];
+
+  // console.log('接收到前端消息：',payload);
+  
+  const threadId = payload.thread_id || smartConstructionAgent.createThreadId();
+  const messages = resolveMessages(payload);
 
   if (!payload.stream) {
-    try {
-      const result = await smartConstructionAgent.run({
-        sessionId,
-        persistSession: true,
-        model: payload.model,
-        messages,
-      });
+    const result = await smartConstructionAgent.run({
+      threadId,
+      messages,
+      persistThread: true,
+    });
 
-      ctx.body = {
-        sessionId,
-        reply: result.text,
-        history: smartConstructionAgent.getSessionHistory(sessionId),
-      };
-      return;
-    } catch (error) {
-      console.error('[agent-route] non-stream failed', {
-        sessionId,
-        model: payload.model,
-        message: toErrorMessage(error),
-      });
-      ctx.status = 500;
-      ctx.body = {
-        error: 'Agent execution failed',
-        message: toErrorMessage(error),
-      };
-      return;
-    }
+    res.json({
+      thread_id: threadId,
+      reply: result.text,
+      selected_tools: result.selectedTools.map((tool) => ({
+        key: tool.key,
+        server_id: tool.serverId,
+        name: tool.name,
+      })),
+    });
+    return;
   }
 
-  prepareSSE(ctx);
-  sendSSEData(ctx, { sessionId, type: 'start' });
+  prepareSSE(res);
+  sendSSEData(res, { type: 'start', thread_id: threadId });
 
   try {
-    await smartConstructionAgent.stream({
-      sessionId,
-      persistSession: true,
-      model: payload.model,
+    const result = await smartConstructionAgent.stream({
+      threadId,
       messages,
+      persistThread: true,
       onToken: (token) => {
-        sendSSEData(ctx, { sessionId, type: 'delta', delta: token });
+        sendSSEData(res, { type: 'delta', thread_id: threadId, delta: token });
+      },
+      onToolStart: ({ name, runtimeName, serverId, toolName, input }) => {
+        sendSSEData(res, {
+          type: 'tool_start',
+          thread_id: threadId,
+          tool: name,
+          runtime_name: runtimeName,
+          server_id: serverId,
+          tool_name: toolName,
+          tool_input: input,
+        });
+      },
+      onToolEnd: ({ name, runtimeName, serverId, toolName }) => {
+        sendSSEData(res, {
+          type: 'tool_end',
+          thread_id: threadId,
+          tool: name,
+          runtime_name: runtimeName,
+          server_id: serverId,
+          tool_name: toolName,
+        });
       },
     });
 
-    sendSSEData(ctx, { sessionId, type: 'done' });
+    sendSSEData(res, {
+      type: 'done',
+      thread_id: threadId,
+      selected_tools: result.selectedTools.map((tool) => ({
+        key: tool.key,
+        server_id: tool.serverId,
+        name: tool.name,
+      })),
+    });
   } catch (error) {
-    console.error('[agent-route] stream failed', {
-      sessionId,
-      model: payload.model,
-      message: toErrorMessage(error),
-    });
-    sendSSEData(ctx, {
-      sessionId,
-      type: 'error',
-      message: toErrorMessage(error),
-    });
-    sendSSEData(ctx, { sessionId, type: 'done' });
-  } finally {
-    endSSE(ctx);
+    const message = error instanceof Error ? error.message : String(error);
+    sendSSEData(res, { type: 'error', thread_id: threadId, error: message });
   }
+
+  endSSE(res);
 });

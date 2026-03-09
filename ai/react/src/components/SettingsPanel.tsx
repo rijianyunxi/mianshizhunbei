@@ -1,15 +1,12 @@
-import { ZH_TEXT } from '../app/copy'
-import { CUSTOM_MODEL_VALUE, PRESET_MODELS } from '../app/config'
-import type { ChatSettings } from '../app/types'
+﻿import { ZH_TEXT } from '../app/copy'
+import type { UseMcpAdminResult } from '../hooks/useMcpAdmin'
 import { CloseIcon } from './icons'
+import { McpPanel } from './McpPanel'
 
 type SettingsPanelProps = {
-  settings: ChatSettings
-  modelSelectValue: string
-  customModelMode: boolean
+  threadId: string
+  mcp: UseMcpAdminResult
   onClose: () => void
-  onModelSelect: (value: string) => void
-  onUpdateSettings: (patch: Partial<ChatSettings>) => void
   onClearConversation: () => void
 }
 
@@ -29,62 +26,19 @@ export function SettingsPanel(props: SettingsPanelProps) {
         </button>
       </div>
 
-      <label className="field">
-        <span>{ZH_TEXT.apiUrl}</span>
-        <input
-          type="url"
-          value={props.settings.apiUrl}
-          onChange={(event) => props.onUpdateSettings({ apiUrl: event.target.value })}
-          placeholder={ZH_TEXT.apiUrlPlaceholder}
-        />
-      </label>
-
-      <label className="field">
-        <span>{ZH_TEXT.apiKey}</span>
-        <input
-          type="password"
-          value={props.settings.apiKey}
-          onChange={(event) => props.onUpdateSettings({ apiKey: event.target.value })}
-          placeholder={ZH_TEXT.apiKeyPlaceholder}
-        />
-      </label>
-
-      <label className="field">
-        <span>{ZH_TEXT.model}</span>
-        <select value={props.modelSelectValue} onChange={(event) => props.onModelSelect(event.target.value)}>
-          {PRESET_MODELS.map((modelName) => (
-            <option key={modelName} value={modelName}>
-              {modelName}
-            </option>
-          ))}
-          <option value={CUSTOM_MODEL_VALUE}>{ZH_TEXT.customModelOption}</option>
-        </select>
-      </label>
-
-      {props.customModelMode ? (
+      <div className="mcp-card">
+        <h3>{ZH_TEXT.backendManagedTitle}</h3>
+        <p>{ZH_TEXT.backendManagedDescription}</p>
         <label className="field">
-          <span>{ZH_TEXT.customModelName}</span>
-          <input
-            type="text"
-            value={props.settings.model}
-            onChange={(event) => props.onUpdateSettings({ model: event.target.value })}
-            placeholder={ZH_TEXT.customModelPlaceholder}
-          />
+          <span>{ZH_TEXT.threadId}</span>
+          <input type="text" value={props.threadId || ZH_TEXT.noThread} readOnly />
         </label>
-      ) : null}
+        <button type="button" className="clear-chat-button" onClick={props.onClearConversation}>
+          {ZH_TEXT.clearConversation}
+        </button>
+      </div>
 
-      <label className="field">
-        <span>{ZH_TEXT.systemPrompt}</span>
-        <textarea
-          value={props.settings.systemPrompt}
-          onChange={(event) => props.onUpdateSettings({ systemPrompt: event.target.value })}
-          rows={4}
-        />
-      </label>
-
-      <button type="button" className="clear-chat-button" onClick={props.onClearConversation}>
-        {ZH_TEXT.clearConversation}
-      </button>
+      <McpPanel mcp={props.mcp} />
     </aside>
   )
 }
