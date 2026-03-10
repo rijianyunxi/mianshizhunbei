@@ -1,5 +1,6 @@
 import { ZH_TEXT } from '../app/copy'
 import type { ConversationSummary } from '../app/types'
+import { TrashIcon } from './icons'
 
 type ConversationSidebarProps = {
   conversations: ConversationSummary[]
@@ -62,13 +63,18 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
               </button>
               <button
                 type="button"
-                className="conversation-delete-button"
-                title={ZH_TEXT.deleteConversation}
-                aria-label={ZH_TEXT.deleteConversation}
-                onClick={() => void props.onDelete(item.threadId)}
+                className="conversation-delete-button danger"
+                title={ZH_TEXT.clearConversation}
+                aria-label={ZH_TEXT.clearConversation}
+                onClick={() => {
+                  if (!window.confirm(ZH_TEXT.confirmDeleteConversation)) {
+                    return
+                  }
+                  void props.onDelete(item.threadId)
+                }}
                 disabled={props.sending}
               >
-                {ZH_TEXT.deletingConversation}
+                <TrashIcon />
               </button>
             </div>
           )

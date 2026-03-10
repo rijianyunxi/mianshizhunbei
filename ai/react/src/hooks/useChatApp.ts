@@ -255,6 +255,15 @@ export function useChatApp(): UseChatAppResult {
     }
   }, [])
 
+  const shouldRetryStreamOnce = useCallback((error: unknown): boolean => {
+    const message =
+      error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+    if (!message) {
+      return false
+    }
+    return /ERR_CONNECTION_RESET|Failed to fetch|NetworkError|socket hang up/i.test(message)
+  }, [])
+
   const sendMessage = useCallback(async () => {
     const content = draft.trim()
     if (!content || sending) {
@@ -300,7 +309,10 @@ export function useChatApp(): UseChatAppResult {
       })
     }
 
+    let receivedActivity = false
+
     const onToolStart = (tool: ToolStreamInfo) => {
+      receivedActivity = true
       const detail = formatToolInputDetail(tool.input)
       const event: ToolEventLogItem = {
         id: makeId('tool-event'),
@@ -333,6 +345,7 @@ export function useChatApp(): UseChatAppResult {
     }
 
     const onToolEnd = (tool: ToolStreamInfo) => {
+      receivedActivity = true
       const event: ToolEventLogItem = {
         id: makeId('tool-event'),
         phase: 'end',
@@ -380,6 +393,7 @@ export function useChatApp(): UseChatAppResult {
     }
 
     const onSelectedTools = (tools: SelectedToolItem[]) => {
+      receivedActivity = true
       updateAssistantMessage((message) => {
         const trace = message.toolTrace ?? createEmptyToolTrace()
         return {
@@ -443,6 +457,7 @@ export function useChatApp(): UseChatAppResult {
         return
       }
 
+      receivedActivity = true
       queuedDelta += delta
       if (flushTimer !== null) {
         return
@@ -455,20 +470,34 @@ export function useChatApp(): UseChatAppResult {
     }
 
     try {
-      await requestAgentReplyStream({
-        input: content,
-        threadId: activeThreadId || null,
-        onThreadId: (nextThreadId) => {
-          if (nextThreadId && nextThreadId !== activeThreadId) {
-            activeThreadId = nextThreadId
-            setThreadId(nextThreadId)
+      let attempt = 0
+
+      while (true) {
+        receivedActivity = false
+        try {
+          await requestAgentReplyStream({
+            input: content,
+            threadId: activeThreadId || null,
+            onThreadId: (nextThreadId) => {
+              if (nextThreadId && nextThreadId !== activeThreadId) {
+                activeThreadId = nextThreadId
+                setThreadId(nextThreadId)
+              }
+            },
+            onDelta: queueDelta,
+            onToolStart,
+            onToolEnd,
+            onSelectedTools,
+          })
+          break
+        } catch (error) {
+          if (attempt === 0 && !receivedActivity && shouldRetryStreamOnce(error)) {
+            attempt += 1
+            continue
           }
-        },
-        onDelta: queueDelta,
-        onToolStart,
-        onToolEnd,
-        onSelectedTools,
-      })
+          throw error
+        }
+      }
 
       if (flushTimer !== null) {
         window.clearTimeout(flushTimer)
@@ -504,6 +533,7 @@ export function useChatApp(): UseChatAppResult {
     messages,
     refreshConversations,
     sending,
+    shouldRetryStreamOnce,
     setThreadId,
     threadId,
   ])

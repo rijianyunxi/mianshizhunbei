@@ -1,6 +1,6 @@
-﻿import rehypeHighlight from 'rehype-highlight'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { Suspense, lazy } from 'react'
+
+const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 
 type MessageMarkdownProps = {
   content: string
@@ -25,22 +25,9 @@ export function MessageMarkdown(props: MessageMarkdownProps) {
 
   return (
     <div className="message-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          a: ({ node, children, ...anchorProps }) => {
-            void node
-            return (
-              <a {...anchorProps} target="_blank" rel="noreferrer">
-                {children}
-              </a>
-            )
-          },
-        }}
-      >
-        {markdown}
-      </ReactMarkdown>
+      <Suspense fallback={<pre className="message-plain">{markdown}</pre>}>
+        <MarkdownRenderer markdown={markdown} />
+      </Suspense>
     </div>
   )
 }

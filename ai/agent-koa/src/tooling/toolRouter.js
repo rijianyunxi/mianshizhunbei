@@ -1,19 +1,13 @@
-﻿import { Document } from '@langchain/core/documents';
-import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
-import { OllamaEmbeddings } from '@langchain/ollama';
-import { env } from '../config/env.js';
-import { mcpRegistry } from '../mcp/mcpRegistry.js';
-
-const BROWSER_INTENT_REGEX =
-  /(https?:\/\/|www\.|打开.*(网站|网页)|访问.*(网站|网页)|浏览(器|网页)|网页|网址|链接|url|website|web\s*page|open\s+.*(url|site|website))/i;
-const BROWSER_HINTS = ['chrome', 'devtools', 'browser', 'page', 'tab', 'url', 'navigate', 'screenshot'];
-const BROWSER_CORE_TOOL_REGEX =
-  /(new[_-]?page|navigate[_-]?page|list[_-]?pages|select[_-]?page|open|goto|go[_-]?to|visit)/i;
+﻿import { Document } from "@langchain/core/documents";
+import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
+import { OllamaEmbeddings } from "@langchain/ollama";
+import { env } from "../config/env.js";
+import { mcpRegistry } from "../mcp/mcpRegistry.js";
 
 function tokenize(text) {
-  return String(text || '')
+  return String(text || "")
     .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, ' ')
+    .replace(/[^a-z0-9_:\u4e00-\u9fa5-]+/g, " ")
     .split(/\s+/)
     .filter(Boolean);
 }
@@ -24,34 +18,45 @@ function buildSearchText(descriptor) {
     descriptor.description,
     JSON.stringify(descriptor.inputSchema || {}),
     `server:${descriptor.serverId}`,
-  ].join('\n');
+  ].join("\n");
 }
 
 function scoreByKeyword(queryTokens, descriptor) {
   if (queryTokens.length === 0) return 0;
-  const haystack = buildSearchText(descriptor).toLowerCase();
+  const name = String(descriptor.name || "").toLowerCase();
+  const description = String(descriptor.description || "").toLowerCase();
+  const schema = JSON.stringify(descriptor.inputSchema || {}).toLowerCase();
+  const serverId = String(descriptor.serverId || "").toLowerCase();
+  const fields = [
+    { text: name, weight: 4 },
+    { text: description, weight: 2 },
+    { text: schema, weight: 1 },
+    { text: serverId, weight: 1 },
+    { text: `server:${serverId}`, weight: 1 },
+  ];
   let score = 0;
   for (const token of queryTokens) {
     if (!token) continue;
-    if (haystack.includes(token)) score += 1;
+    for (const field of fields) {
+      if (!field.text) continue;
+      if (field.text.includes(token)) score += field.weight;
+    }
   }
   return score;
 }
 
-function isBrowserIntent(query) {
-  return BROWSER_INTENT_REGEX.test(String(query || '').trim());
-}
-
-function scoreBrowserHints(descriptor) {
-  const haystack = buildSearchText(descriptor).toLowerCase();
-  let score = 0;
-  for (const hint of BROWSER_HINTS) {
-    if (haystack.includes(hint)) score += 1;
-  }
-  if (BROWSER_CORE_TOOL_REGEX.test(String(descriptor.name || ''))) {
-    score += 100;
-  }
-  return score;
+function rankByKeyword(queryTokens, descriptors) {
+  if (queryTokens.length === 0) return [];
+  return Array.from(descriptors)
+    .map((descriptor) => ({
+      descriptor,
+      score: scoreByKeyword(queryTokens, descriptor),
+    }))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.descriptor.name.localeCompare(b.descriptor.name),
+    );
 }
 
 function dedupeByKey(list) {
@@ -69,11 +74,16 @@ function dedupeByKey(list) {
 export class ToolRouter {
   constructor() {
     this.topK = env.TOOL_ROUTER_TOP_K;
+    this.keywordMinScore = env.TOOL_ROUTER_KEYWORD_MIN_SCORE;
+    this.vectorMinScore = env.TOOL_ROUTER_VECTOR_MIN_SCORE;
+    this.vectorMinScoreIfNoKeyword =
+      env.TOOL_ROUTER_VECTOR_MIN_SCORE_IF_NO_KEYWORD;
     this.embedTimeoutMs = env.TOOL_ROUTER_EMBED_TIMEOUT_MS;
     this.descriptorByKey = new Map();
     this.vectorStore = null;
     this.vectorEnabled = false;
     this.lastError = null;
+    this.rebuildPromise = null;
 
     this.embeddings = new OllamaEmbeddings({
       baseUrl: env.OLLAMA_BASE_URL,
@@ -81,7 +91,10 @@ export class ToolRouter {
       maxRetries: 0,
       fetch: async (input, init = {}) => {
         const timeoutController = new AbortController();
-        const timer = setTimeout(() => timeoutController.abort(), this.embedTimeoutMs);
+        const timer = setTimeout(
+          () => timeoutController.abort(),
+          this.embedTimeoutMs,
+        );
 
         let relayAbort = null;
         if (init.signal) {
@@ -89,16 +102,19 @@ export class ToolRouter {
             timeoutController.abort();
           } else {
             relayAbort = () => timeoutController.abort();
-            init.signal.addEventListener('abort', relayAbort, { once: true });
+            init.signal.addEventListener("abort", relayAbort, { once: true });
           }
         }
 
         try {
-          return await fetch(input, { ...init, signal: timeoutController.signal });
+          return await fetch(input, {
+            ...init,
+            signal: timeoutController.signal,
+          });
         } finally {
           clearTimeout(timer);
           if (relayAbort && init.signal) {
-            init.signal.removeEventListener('abort', relayAbort);
+            init.signal.removeEventListener("abort", relayAbort);
           }
         }
       },
@@ -106,7 +122,7 @@ export class ToolRouter {
   }
 
   async isEmbeddingBackendHealthy() {
-    const base = String(env.OLLAMA_BASE_URL || '').replace(/\/+$/, '');
+    const base = String(env.OLLAMA_BASE_URL || "").replace(/\/+$/, "");
     if (!base) return false;
 
     try {
@@ -131,6 +147,14 @@ export class ToolRouter {
   }
 
   async rebuildIndex() {
+    if (this.rebuildPromise) return this.rebuildPromise;
+    this.rebuildPromise = this._rebuildIndexInternal().finally(() => {
+      this.rebuildPromise = null;
+    });
+    return this.rebuildPromise;
+  }
+
+  async _rebuildIndexInternal() {
     this.lastError = null;
 
     const descriptors = mcpRegistry.getToolDescriptors();
@@ -145,7 +169,8 @@ export class ToolRouter {
     if (!(await this.isEmbeddingBackendHealthy())) {
       this.vectorStore = null;
       this.vectorEnabled = false;
-      this.lastError = 'embedding backend unavailable, fallback to keyword routing';
+      this.lastError =
+        "embedding backend unavailable, fallback to keyword routing";
       return this.getStatus();
     }
 
@@ -158,7 +183,10 @@ export class ToolRouter {
           }),
       );
 
-      this.vectorStore = await MemoryVectorStore.fromDocuments(documents, this.embeddings);
+      this.vectorStore = await MemoryVectorStore.fromDocuments(
+        documents,
+        this.embeddings,
+      );
       this.vectorEnabled = true;
     } catch (error) {
       this.vectorStore = null;
@@ -169,55 +197,79 @@ export class ToolRouter {
     return this.getStatus();
   }
 
-  keywordFallback(query, limit) {
-    const queryTokens = tokenize(query);
-    const ranked = Array.from(this.descriptorByKey.values())
-      .map((descriptor) => ({ descriptor, score: scoreByKeyword(queryTokens, descriptor) }))
-      .sort((a, b) => b.score - a.score || a.descriptor.name.localeCompare(b.descriptor.name));
+  keywordFallbackFromRanked(ranked, limit) {
+    const maxScore = ranked.length > 0 ? ranked[0].score : 0;
+    if (maxScore < this.keywordMinScore) return [];
 
-    return ranked.slice(0, limit).map((item) => item.descriptor);
+    return ranked
+      .filter((item) => item.score >= this.keywordMinScore)
+      .slice(0, limit)
+      .map((item) => item.descriptor);
   }
 
-  browserIntentFallback(limit) {
-    const ranked = Array.from(this.descriptorByKey.values())
-      .map((descriptor) => ({ descriptor, score: scoreBrowserHints(descriptor) }))
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score || a.descriptor.name.localeCompare(b.descriptor.name));
-
-    return ranked.slice(0, limit).map((item) => item.descriptor);
+  keywordFallback(query, limit) {
+    const queryTokens = tokenize(query);
+    const ranked = rankByKeyword(queryTokens, this.descriptorByKey.values());
+    return this.keywordFallbackFromRanked(ranked, limit);
   }
 
   async selectTools(query, limit = this.topK) {
-    const browserIntent = isBrowserIntent(query);
-    const desired = browserIntent ? Math.max(limit, 6) : limit;
-    const maxCount = Math.max(1, Math.min(desired, this.descriptorByKey.size || 1));
+    const maxCount = Math.max(
+      1,
+      Math.min(limit, this.descriptorByKey.size || 1),
+    );
     if (this.descriptorByKey.size === 0) return [];
 
-    const browserCandidates = browserIntent ? this.browserIntentFallback(maxCount) : [];
-    if (browserCandidates.length >= maxCount) {
-      return browserCandidates.slice(0, maxCount);
-    }
+    const queryText = String(query || "").trim();
+    const queryTokens = tokenize(queryText);
+    const keywordRanked = rankByKeyword(
+      queryTokens,
+      this.descriptorByKey.values(),
+    );
+    const keywordMaxScore = keywordRanked.length > 0 ? keywordRanked[0].score : 0;
+    const vectorMinScore =
+      keywordMaxScore >= this.keywordMinScore
+        ? this.vectorMinScore
+        : this.vectorMinScoreIfNoKeyword;
 
-    if (this.vectorEnabled && this.vectorStore && String(query || '').trim().length > 0) {
+    if (this.vectorEnabled && this.vectorStore && queryText.length > 0) {
       try {
-        const docs = await this.vectorStore.similaritySearch(String(query), maxCount);
         const selected = [];
-        for (const doc of docs) {
-          const key = doc?.metadata?.key;
-          if (!key) continue;
-          const descriptor = this.descriptorByKey.get(String(key));
-          if (descriptor) selected.push(descriptor);
+        if (typeof this.vectorStore.similaritySearchWithScore === "function") {
+          const docsWithScore =
+            await this.vectorStore.similaritySearchWithScore(
+              String(query),
+              maxCount,
+            );
+          for (const [doc, score] of docsWithScore) {
+            if (score < vectorMinScore) continue;
+            const key = doc?.metadata?.key;
+            if (!key) continue;
+            const descriptor = this.descriptorByKey.get(String(key));
+            if (descriptor) selected.push(descriptor);
+          }
+        } else {
+          const docs = await this.vectorStore.similaritySearch(
+            String(query),
+            maxCount,
+          );
+          for (const doc of docs) {
+            const key = doc?.metadata?.key;
+            if (!key) continue;
+            const descriptor = this.descriptorByKey.get(String(key));
+            if (descriptor) selected.push(descriptor);
+          }
         }
         if (selected.length > 0) {
-          return dedupeByKey([...browserCandidates, ...selected]).slice(0, maxCount);
+          return dedupeByKey(selected).slice(0, maxCount);
         }
       } catch (error) {
         this.lastError = error instanceof Error ? error.message : String(error);
       }
     }
 
-    const keyword = this.keywordFallback(query, maxCount);
-    return dedupeByKey([...browserCandidates, ...keyword]).slice(0, maxCount);
+    const keyword = this.keywordFallbackFromRanked(keywordRanked, maxCount);
+    return dedupeByKey(keyword).slice(0, maxCount);
   }
 }
 

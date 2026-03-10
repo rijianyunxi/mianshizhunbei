@@ -26,6 +26,61 @@ export function SettingsIcon(props: BooleanIconProps) {
   )
 }
 
+export function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm8.2 3.4a6.45 6.45 0 0 0-.1-1.2l2-1.55a1 1 0 0 0 .24-1.32l-1.9-3.28a1 1 0 0 0-1.26-.45l-2.35.95a7.7 7.7 0 0 0-2.08-1.2l-.35-2.5a1 1 0 0 0-.98-.86H9.58a1 1 0 0 0-.98.86l-.35 2.5c-.73.3-1.42.7-2.07 1.2l-2.35-.95a1 1 0 0 0-1.26.45L.67 7.93a1 1 0 0 0 .24 1.32l2 1.55a7.9 7.9 0 0 0 0 2.4l-2 1.55a1 1 0 0 0-.24 1.32l1.9 3.28a1 1 0 0 0 1.26.45l2.35-.95c.65.5 1.34.9 2.07 1.2l.35 2.5a1 1 0 0 0 .98.86h4.84a1 1 0 0 0 .98-.86l.35-2.5a7.7 7.7 0 0 0 2.08-1.2l2.35.95a1 1 0 0 0 1.26-.45l1.9-3.28a1 1 0 0 0-.24-1.32l-2-1.55c.07-.4.1-.8.1-1.2Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+export function SlidersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M7 5a2 2 0 0 1 4 0v1h9a1 1 0 1 1 0 2h-9v1a2 2 0 0 1-4 0V8H4a1 1 0 1 1 0-2h3V5Zm6 10a2 2 0 0 1 4 0v1h3a1 1 0 1 1 0 2h-3v1a2 2 0 0 1-4 0v-1H4a1 1 0 1 1 0-2h9v-1Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+export function PlugIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M8 2a1 1 0 0 1 1 1v4h6V3a1 1 0 1 1 2 0v4h2a1 1 0 1 1 0 2h-2v2.2a6 6 0 0 1-5 5.92V21a1 1 0 1 1-2 0v-3.88a6 6 0 0 1-5-5.92V9H3a1 1 0 1 1 0-2h2V3a1 1 0 0 1 1-1Zm1 7v2.2a4 4 0 0 0 8 0V9H9Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+export function TerminalIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 0v16h12V4H6Zm2.3 4.3a1 1 0 0 1 1.4 0l3.3 3.3a1 1 0 0 1 0 1.4l-3.3 3.3a1 1 0 0 1-1.4-1.4L10.59 12 8.3 9.7a1 1 0 0 1 0-1.4ZM12 16a1 1 0 1 1 0-2h4a1 1 0 1 1 0 2h-4Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+export function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm1 2V5h4v0H10Zm-1 4a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0v-7a1 1 0 0 1 1-1Zm6 0a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0v-7a1 1 0 0 1 1-1Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
 type ThemeIconProps = {
   theme: Theme
 }
@@ -68,6 +123,17 @@ export function SendIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M20.33 3.66a1 1 0 0 0-1.02-.24L3.96 8.53a1 1 0 0 0-.04 1.88l6.25 2.42 2.42 6.25a1 1 0 0 0 1.88-.04l5.1-15.35a1 1 0 0 0-.24-1.03Zm-6.12 12.1-1.52-3.93a1 1 0 0 0-.58-.58l-3.93-1.52 8.5-2.83-2.47 8.86Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+export function SidebarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm4 0v16h10V4H8Zm-2 0v16h1V4H6Zm5 4h5a1 1 0 1 1 0 2h-5a1 1 0 0 1 0-2Zm0 4h5a1 1 0 1 1 0 2h-5a1 1 0 0 1 0-2Zm0 4h5a1 1 0 1 1 0 2h-5a1 1 0 0 1 0-2Z"
         fill="currentColor"
       />
     </svg>

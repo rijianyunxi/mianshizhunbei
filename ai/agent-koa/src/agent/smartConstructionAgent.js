@@ -180,7 +180,8 @@ export class SmartConstructionAgentService {
 
     const query = extractLatestUserQuery(input.messages);
     const selectedTools = await toolRouter.selectTools(query, env.TOOL_ROUTER_TOP_K);
-
+    console.log('====',selectedTools);
+    
     const tools = selectedTools.map((descriptor) => {
       const schema = jsonSchemaToZod(descriptor.inputSchema);
       return new DynamicStructuredTool({
