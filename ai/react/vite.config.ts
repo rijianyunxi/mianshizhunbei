@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import lifecycleLoggerPlugin from './plugin/index.ts'
 // import { visualizer } from "rollup-plugin-visualizer";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    lifecycleLoggerPlugin(),
     // visualizer({
     //   open: true,
     //   filename: "dist/stats.html", // 明确放到打包产物目录下
@@ -51,13 +53,13 @@ export default defineConfig({
       },
     },
 
-    // modulePreload: {
-    //   resolveDependencies: (filename, deps, context) => {
-    //     void filename;
-    //     void context;
-    //     // 过滤掉 markdown-parser，不让它在首屏预加载
-    //     return deps.filter(dep => !dep.includes('markdown-parser'));
-    //   }
-    // },
+    modulePreload: {
+      resolveDependencies: (filename, deps, context) => {
+        void filename;
+        void context;
+        // 过滤掉 markdown-parser，不让它在首屏预加载
+        return deps.filter(dep => !dep.includes('markdown-parser'));
+      }
+    },
   },
 });

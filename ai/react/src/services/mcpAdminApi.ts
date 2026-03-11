@@ -94,6 +94,7 @@ function normalizeTool(input: unknown): McpToolDescriptor | null {
     serverId,
     name,
     description: typeof value.description === 'string' ? value.description : '',
+    inputSchema: value.input_schema && typeof value.input_schema === 'object' ? (value.input_schema as Record<string, unknown>) : undefined,
   }
 }
 

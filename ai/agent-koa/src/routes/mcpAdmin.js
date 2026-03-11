@@ -84,6 +84,7 @@ mcpAdminRouter.get('/admin/mcp/tools', async (_req, res) => {
       server_id: tool.serverId,
       name: tool.name,
       description: tool.description,
+      input_schema: tool.inputSchema,
     })),
     router: toolRouter.getStatus(),
   });

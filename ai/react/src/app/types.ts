@@ -90,6 +90,7 @@ export type McpToolDescriptor = {
   serverId: string
   name: string
   description: string
+  inputSchema?: Record<string, unknown>
 }
 
 export type McpEnableInput = {
