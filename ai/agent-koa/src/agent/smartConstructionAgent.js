@@ -85,11 +85,27 @@ function extractLatestUserQuery(messages) {
   return '';
 }
 
+function sanitizeMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  const sanitized = [];
+
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    const role = normalizeRole(message.role);
+    const content = String(message.content ?? '').trim();
+    if (!content) continue;
+    sanitized.push({ role, content });
+  }
+
+  return sanitized;
+}
+
 function buildSlidingWindow(messages) {
-  const normalized = messages.map((message) => ({
-    role: normalizeRole(message.role),
-    content: String(message.content || '').trim(),
-  }));
+  const normalized = sanitizeMessages(messages);
+
+  if (normalized.length === 0) {
+    return [{ role: 'system', content: AGENT_SYSTEM_PROMPT }];
+  }
 
   const firstSystem = normalized.find((message) => message.role === 'system');
   const nonSystem = normalized.filter((message) => message.role !== 'system');

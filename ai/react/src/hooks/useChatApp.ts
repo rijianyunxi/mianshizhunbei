@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ZH_TEXT } from '../app/copy'
 import {
   CHAT_THEME_STORAGE_KEY,
@@ -43,6 +43,7 @@ type UseChatAppResult = {
   mcp: UseMcpAdminResult
   setDraft: (value: string) => void
   sendMessage: () => Promise<void>
+  stopStreaming: () => void
   clearConversation: () => void
   createConversation: () => Promise<void>
   selectConversation: (threadId: string) => Promise<void>
@@ -88,6 +89,7 @@ export function useChatApp(): UseChatAppResult {
   const [error, setError] = useState('')
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const mcp = useMcpAdmin()
   const mcpRefresh = mcp.refresh
@@ -469,6 +471,22 @@ export function useChatApp(): UseChatAppResult {
       }, 28)
     }
 
+    const abortController = new AbortController()
+    abortRef.current = abortController
+
+    const isAbortError = (error: unknown) => {
+      if (!error) {
+        return false
+      }
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return true
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
+        return true
+      }
+      return false
+    }
+
     try {
       let attempt = 0
 
@@ -478,6 +496,7 @@ export function useChatApp(): UseChatAppResult {
           await requestAgentReplyStream({
             input: content,
             threadId: activeThreadId || null,
+            signal: abortController.signal,
             onThreadId: (nextThreadId) => {
               if (nextThreadId && nextThreadId !== activeThreadId) {
                 activeThreadId = nextThreadId
@@ -491,6 +510,9 @@ export function useChatApp(): UseChatAppResult {
           })
           break
         } catch (error) {
+          if (isAbortError(error)) {
+            throw error
+          }
           if (attempt === 0 && !receivedActivity && shouldRetryStreamOnce(error)) {
             attempt += 1
             continue
@@ -510,8 +532,10 @@ export function useChatApp(): UseChatAppResult {
         setThreadId(activeThreadId)
       }
     } catch (requestError) {
-      markRunningToolsError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
-      setError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
+      if (!isAbortError(requestError)) {
+        markRunningToolsError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
+        setError(requestError instanceof Error ? requestError.message : ZH_TEXT.errUnknown)
+      }
       setMessages((prev) => {
         const last = prev[prev.length - 1]
         if (!last || last.id !== assistantMessage.id || last.content.trim()) {
@@ -526,6 +550,9 @@ export function useChatApp(): UseChatAppResult {
       flushDelta()
       setSending(false)
       setStreamingMessageId(null)
+      if (abortRef.current === abortController) {
+        abortRef.current = null
+      }
     }
   }, [
     draft,
@@ -537,6 +564,13 @@ export function useChatApp(): UseChatAppResult {
     setThreadId,
     threadId,
   ])
+
+  const stopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+  }, [])
 
   const clearConversation = useCallback(() => {
     if (!threadId || sending) {
@@ -574,6 +608,7 @@ export function useChatApp(): UseChatAppResult {
     mcp,
     setDraft,
     sendMessage,
+    stopStreaming,
     clearConversation,
     createConversation: createConversationAction,
     selectConversation,

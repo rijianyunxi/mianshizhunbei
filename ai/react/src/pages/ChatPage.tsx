@@ -5,7 +5,6 @@ import { ChatHeader } from '../components/ChatHeader'
 import { ConversationSidebar } from '../components/ConversationSidebar'
 import { MessageList } from '../components/MessageList'
 import { SettingsPanel } from '../components/SettingsPanel'
-import { GearIcon, SidebarIcon, ThemeIcon } from '../components/icons'
 import { useChatApp } from '../hooks/useChatApp'
 
 export default function ChatPage() {
@@ -32,39 +31,12 @@ export default function ChatPage() {
     <div
       className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}
     >
-      <aside className="left-rail">
-        <div className="rail-group">
-          <button
-            type="button"
-            className="rail-button"
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            aria-label={sidebarOpen ? ZH_TEXT.ariaCloseSidebar : ZH_TEXT.ariaOpenSidebar}
-            title={sidebarOpen ? ZH_TEXT.ariaCloseSidebar : ZH_TEXT.ariaOpenSidebar}
-          >
-            <SidebarIcon />
-          </button>
-        </div>
-        <div className="rail-group rail-group-bottom">
-          <button
-            type="button"
-            className="rail-button"
-            onClick={chat.toggleSettings}
-            aria-label={chat.settingsOpen ? ZH_TEXT.ariaCloseSettings : ZH_TEXT.ariaOpenSettings}
-            title={chat.settingsOpen ? ZH_TEXT.ariaCloseSettings : ZH_TEXT.ariaOpenSettings}
-          >
-            <GearIcon />
-          </button>
-          <button
-            type="button"
-            className="rail-button"
-            onClick={chat.toggleTheme}
-            aria-label={chat.theme === 'dark' ? ZH_TEXT.ariaSwitchToLight : ZH_TEXT.ariaSwitchToDark}
-            title={chat.theme === 'dark' ? ZH_TEXT.ariaSwitchToLight : ZH_TEXT.ariaSwitchToDark}
-          >
-            <ThemeIcon theme={chat.theme} />
-          </button>
-        </div>
-      </aside>
+      <button
+        type="button"
+        className="sidebar-overlay"
+        aria-label={ZH_TEXT.ariaCloseSidebar}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       <ConversationSidebar
         conversations={chat.conversations}
@@ -84,7 +56,15 @@ export default function ChatPage() {
       ) : null}
 
       <main className="chat-main">
-        <ChatHeader threadId={chat.threadId} />
+        <ChatHeader
+          threadId={chat.threadId}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          settingsOpen={chat.settingsOpen}
+          onToggleSettings={chat.toggleSettings}
+          theme={chat.theme}
+          onToggleTheme={chat.toggleTheme}
+        />
         <MessageList
           messages={chat.messages}
           streamingMessageId={chat.streamingMessageId}
@@ -96,6 +76,7 @@ export default function ChatPage() {
           sending={chat.sending}
           onChange={chat.setDraft}
           onSend={chat.sendMessage}
+          onStop={chat.stopStreaming}
         />
       </main>
     </div>

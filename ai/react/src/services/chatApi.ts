@@ -5,6 +5,7 @@ import type { SelectedToolItem, ToolStreamInfo } from '../app/types'
 type RequestAssistantReplyStreamInput = {
   input: string
   threadId: string | null
+  signal?: AbortSignal
   onThreadId?: (threadId: string) => void
   onDelta: (delta: string) => void
   onToolStart?: (tool: ToolStreamInfo) => void
@@ -151,6 +152,7 @@ export async function requestAgentReplyStream(input: RequestAssistantReplyStream
   const response = await fetch(`${BACKEND_BASE_URL}/agent/chat`, {
     method: 'POST',
     headers: buildHeaders(BACKEND_API_TOKEN),
+    signal: input.signal,
     body: JSON.stringify({
       thread_id: input.threadId || undefined,
       input: input.input,
