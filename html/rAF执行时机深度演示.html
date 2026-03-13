@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>rAF 执行时机深度演示</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .box { width: 50px; height: 50px; background: #3b82f6; position: relative; margin-bottom: 20px; border-radius: 8px; }
+        .controls { margin-bottom: 20px; }
+        button { padding: 10px 20px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 4px; margin-right: 10px; }
+        button.heavy { background: #ef4444; }
+        #log { background: #f3f4f6; padding: 15px; border-radius: 8px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .highlight { color: #2563eb; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>requestAnimationFrame (rAF) 性能实验</h2>
+    
+    <div id="moveBox" class="box"></div>
+
+    <div class="controls">
+        <button onclick="startNormal()">开始正常监测 (无任务)</button>
+        <button class="heavy" onclick="startHeavyTask()">触发重任务 (阻塞 500ms)</button>
+        <button onclick="clearLog()" style="background:#6b7280">清空日志</button>
+    </div>
+
+    <div id="log">等待操作...</div>
+
+
+    <script>
+        requestIdleCallback((e)=>{
+            console.log(99,e.timeRemaining());
+            
+        })
+    </script>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const box = document.getElementById('moveBox');
+        let lastTime = performance.now();
+        let boxPos = 0;
+
+        // 持续驱动一个简单的 JS 动画，用于视觉观察
+        function animate() {
+            boxPos = (boxPos + 2) % 300;
+            box.style.left = boxPos + 'px';
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        function addLog(msg) {
+            const time = performance.now().toFixed(2);
+            logEl.innerHTML += `[${time}ms] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // 1. 正常监测
+        function startNormal() {
+            addLog("<span class='highlight'>--- 开始 5 帧正常 rAF 监测 ---</span>");
+            let count = 0;
+            const trace = (timestamp) => {
+                const gap = (timestamp - lastTime).toFixed(2);
+                addLog(`rAF 触发，距离上一帧: ${gap}ms`);
+                lastTime = timestamp;
+                if (++count < 5) requestAnimationFrame(trace);
+            };
+            requestAnimationFrame(trace);
+        }
+
+        // 2. 模拟重任务
+        function startHeavyTask() {
+            addLog("<span class='highlight'>--- 准备执行重任务 (阻塞主线程 500ms) ---</span>");
+            
+            // 预先注册一个 rAF
+            requestAnimationFrame((timestamp) => {
+                addLog("<b>执行重任务后的第一个 rAF 回调!</b>");
+                const gap = (timestamp - lastTime).toFixed(2);
+                addLog(`由于主线程被阻塞，此帧间隔了: <span style='color:red'>${gap}ms</span>`);
+                lastTime = timestamp;
+            });
+
+            // 立即执行耗时任务（死循环）
+            setTimeout(() => {
+                const start = performance.now();
+                addLog("主线程开始阻塞...");
+                while (performance.now() - start < 500) {
+                    // 模拟 CPU 密集计算，主线程此时完全无法响应
+                }
+                addLog("主线程阻塞结束！");
+            }, 100); 
+        }
+
+        function clearLog() { logEl.innerHTML = "等待操作..."; }
+    </script>
+</body>
+</html>

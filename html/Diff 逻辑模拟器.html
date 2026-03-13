@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>打开控制台查看 Diff 过程 🚀</h2>
+  <script>
+    // 模拟 Vue 的核心 Diff 逻辑（简化版）
+    function simulateDiff(oldList, newList) {
+      console.log(`%c[开始 Diff] 从 [${oldList}] 变为 [${newList}]`, 'color: #3b82f6; font-weight: bold');
+      
+      let oldStartIdx = 0;
+      let newStartIdx = 0;
+      let oldEndIdx = oldList.length - 1;
+      let newEndIdx = newList.length - 1;
+
+      // 只要两边指针没碰头，就继续比
+      while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+        if (oldList[oldStartIdx] === newList[newStartIdx]) {
+          console.log(`✅ [头头命中]: 复用 ${oldList[oldStartIdx]}`);
+          oldStartIdx++; newStartIdx++;
+        } 
+        else if (oldList[oldEndIdx] === newList[newEndIdx]) {
+          console.log(`✅ [尾尾命中]: 复用 ${oldList[oldEndIdx]}`);
+          oldEndIdx--; newEndIdx--;
+        } 
+        else if (oldList[oldStartIdx] === newList[newEndIdx]) {
+          console.log(`🔄 [头尾交叉]: 复用并移动 ${oldList[oldStartIdx]} 到末尾`);
+          oldStartIdx++; newEndIdx--;
+        }
+        else if (oldList[oldEndIdx] === newList[newStartIdx]) {
+          console.log(`🔄 [尾头交叉]: 复用并移动 ${oldList[oldEndIdx]} 到头部`);
+          oldEndIdx--; newStartIdx++;
+        }
+        else {
+          console.log(`🆕 [全量搜索]: 无法简单复用，查找或新建 ${newList[newStartIdx]}`);
+          newStartIdx++;
+        }
+      }
+
+      // 剩余处理
+      if (oldStartIdx > oldEndIdx) {
+        for (let i = newStartIdx; i <= newEndIdx; i++) {
+          console.log(`➕ [新增]: ${newList[i]}`);
+        }
+      } else if (newStartIdx > newEndIdx) {
+        for (let i = oldStartIdx; i <= oldEndIdx; i++) {
+          console.log(`➖ [移除]: ${oldList[i]}`);
+        }
+      }
+    }
+
+    // 测试用例 1：简单的头部插入
+    simulateDiff(['A', 'B', 'C'], ['New', 'A', 'B', 'C']);
+    
+    // 测试用例 2：复杂的乱序
+    console.log('\n--- 乱序场景 ---');
+    simulateDiff(['A', 'B', 'C', 'D'], ['D', 'C', 'B', 'A']);
+  </script>
+</body>
+</html>

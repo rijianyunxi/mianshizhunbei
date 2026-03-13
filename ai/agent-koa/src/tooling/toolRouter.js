@@ -5,17 +5,29 @@ import { mcpRegistry } from "../mcp/mcpRegistry.js";
 import { KeywordSearch } from "./KeywordSearch.js"; 
 
 /**
- * 组装工具的检索文本 (供大模型生成向量使用)
+ * [🚀 核心优化]：重写组装逻辑，消除 JSON 噪音，增强自然语言语义
+ * 避免模型因为 "type", "string", "object" 等通用词汇产生错误的相似度
  * @param {Object} descriptor - 工具描述对象
  * @returns {string} 纯文本字符串
  */
 function buildSearchText(descriptor) {
-  return [
-    descriptor.name,
-    descriptor.description,
-    JSON.stringify(descriptor.inputSchema || {}),
-    `server:${descriptor.serverId}`,
-  ].join("\n");
+  // 1. 提取参数名称和描述，丢弃 JSON 结构噪音
+  let paramsDesc = "无";
+  if (descriptor.inputSchema && descriptor.inputSchema.properties) {
+    const props = descriptor.inputSchema.properties;
+    // 提取所有参数的 key，如果参数本身有 description 也可以一并加上
+    paramsDesc = Object.keys(props).join(", ");
+  }
+
+  // 2. 使用结构化的自然语言模板拼接
+  // 注意：去掉了 serverId，因为它属于系统标识，通常对理解工具"用途"没有语义帮助
+  const parts = [
+    `工具名称: ${descriptor.name}`,
+    `功能描述: ${descriptor.description}`,
+    `接收参数: ${paramsDesc}`
+  ];
+
+  return parts.join("。");
 }
 
 /**
@@ -59,7 +71,6 @@ export class ToolRouter {
       model: env.OLLAMA_EMBED_MODEL,
       maxRetries: 0,
       fetch: async (input, init = {}) => {
-        // ... 此处的超时 fetch 逻辑保持不变 ...
         const timeoutController = new AbortController();
         const timer = setTimeout(() => timeoutController.abort(), this.embedTimeoutMs);
         let relayAbort = null;
@@ -172,6 +183,9 @@ export class ToolRouter {
         }));
         
         scoredDocs.sort((a, b) => b.score - a.score);
+        console.log(`[得分透视] "${queryText}" 的匹配分数:`, scoredDocs.map(d => `${d.descriptor.name}: ${d.score.toFixed(4)}`));
+        // [🚀 调试辅助] 如果你需要排查为什么匹配到了奇怪的工具，可以取消下面这行的注释查看所有工具的分数：
+        // console.log("向量检索打分结果:", scoredDocs.map(d => ({ name: d.descriptor.name, score: d.score.toFixed(4) })));
 
         for (const item of scoredDocs) {
           if (item.score < vectorMinScore) continue;

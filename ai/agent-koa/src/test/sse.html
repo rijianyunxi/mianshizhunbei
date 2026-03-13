@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <style>
+      pre {
+        height: 400px;
+        width: 600px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SSE</h1>
+    <div>
+      <input type="text" />
+      <button>发送</button>
+    </div>
+    <pre>111</pre>
+    <script>
+      let inputContent = "";
+      const OInput = document.querySelector("input");
+      const OPre = document.querySelector("pre");
+      const OBtn = document.querySelector("button");
+
+      OInput.addEventListener("input", (e) => {
+        inputContent = e.target.value;
+      });
+      OBtn.addEventListener("click", (e) => {
+        console.log("inputContent query", inputContent);
+        fetchQwenNormal(inputContent);
+      });
+    </script>
+
+    <script>
+      const OPENAI_API_KEY = "sk-632abaab39ec41d1a18014e5a977beeb"; // 实际使用时替换为真实的 DashScope API Key
+      const OPENAI_BASE_URL =
+        "https://dashscope.aliyuncs.com/compatible-mode/v1";
+      const OPENAI_MODEL = "qwen3.5-plus";
+
+      // 拼接完整的请求地址
+      const endpoint = `${OPENAI_BASE_URL}/chat/completions`;
+
+      // 统一的请求头
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      };
+
+      async function fetchQwenNormal(prompt) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({
+              model: OPENAI_MODEL,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "你只能用户输入什么，你就把用户输入的内容返回，禁止任何改动联想。",
+                },
+                // { role: "user", content: prompt },
+                { role: "user", content: "请用十个字介绍下你自己" },
+              ],
+              stream: true,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              `请求失败: ${response.status} - ${JSON.stringify(errorData)}`,
+            );
+          }
+
+          let reader = response.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+          console.log("🤖 AI 开始回复 (流式):");
+
+          //   while(true){
+          //     const { done, value } = await reader.read();
+          //     if (done) break;
+          //     buffer += decoder.decode(value, { stream: true });
+          //     console.log(buffer);
+          //   }
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // 处理粘包和半包的内层循环
+            while (true) {
+              const boundary = /\r?\n\r?\n/.exec(buffer);
+              if (!boundary) break;
+
+              const rawEvent = buffer.slice(0, boundary.index);
+              buffer = buffer.slice(boundary.index + boundary[0].length);
+
+              // 去掉 "data: " 前缀
+              const dataStr = rawEvent.replace(/^data:\s*/, "").trim();
+              
+
+              // 遇到结束符，跳出
+              if (dataStr === "[DONE]") {
+                console.log("\n✅ [输出结束]");
+                return;
+              }
+
+              if (!dataStr) continue;
+
+              try {
+                const parsed = JSON.parse(dataStr);
+                // 提取增量文本片段 (delta)
+                const content = parsed.choices[0]?.delta?.content || "";
+                // 直接在控制台无换行打印，模拟打字机
+                console.log(content);
+              } catch (err) {
+                console.error("\n解析 JSON 失败:", err, "原始数据:", dataStr);
+              }
+            }
+          }
+
+
+          console.log(buffer);
+        } catch (error) {
+          console.error("Fetch 错误:", error);
+        }
+      }
+    </script>
+  </body>
+</html>

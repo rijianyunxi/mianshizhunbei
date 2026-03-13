@@ -11,6 +11,9 @@ import { rpcRouter } from './routes/rpc.js';
 import { threadsRouter } from './routes/threads.js';
 import { toolRouter } from './tooling/toolRouter.js';
 
+import './test/embedding.js'
+
+
 const app = express();
 
 app.use(cors());

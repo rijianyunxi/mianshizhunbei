@@ -6,7 +6,7 @@ import lifecycleLoggerPlugin from './plugin/index.ts'
 export default defineConfig({
   plugins: [
     react(),
-    lifecycleLoggerPlugin(),
+    // lifecycleLoggerPlugin(),
     // visualizer({
     //   open: true,
     //   filename: "dist/stats.html", // 明确放到打包产物目录下

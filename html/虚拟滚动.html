@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>高性能虚拟列表 Demo</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px;
+        background: #f0f2f5;
+      }
+      .header {
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 400px;
+      }
+      button {
+        padding: 8px 16px;
+        background: #1890ff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #40a9ff;
+      }
+      .status {
+        font-size: 14px;
+        color: #555;
+      }
+
+      /* 1. 外层容器 (Viewport) */
+      #viewport {
+        width: 400px;
+        height: 400px; /* 视口高度固死 */
+        overflow-y: auto; /* 必须有滚动条 */
+        position: relative;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        /* 优化滚动体验 */
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* 2. 中层幽灵占位符 (Phantom) */
+      #phantom {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        z-index: -1;
+        /* 高度由 JS 动态计算：总数据量 * 单行高度 */
+      }
+
+      /* 3. 内层真实 DOM 容器 (Content) */
+      #content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        /* 核心：使用 transform 进行位移补偿 */
+      }
+
+      /* 列表项样式 */
+      .list-item {
+        height: 40px; /* 固定单行高度 */
+        line-height: 40px;
+        padding: 0 15px;
+        border-bottom: 1px solid #eee;
+        box-sizing: border-box;
+        color: #333;
+        display: flex;
+        justify-content: space-between;
+      }
+      .list-item span.time {
+        color: #999;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <button id="resumeBtn">恢复自动滚动</button>
+      <div class="status" id="statusText">状态: 自动滚动中...</div>
+    </div>
+
+    <div id="viewport">
+      <div id="phantom"></div>
+      <div id="content"></div>
+    </div>
+
+    <script>
+      // --- 配置与状态 ---
+      const ITEM_HEIGHT = 40; // 单行固定高度
+      const VIEWPORT_HEIGHT = 400; // 视口高度
+      // 缓冲渲染量：视口能容纳 10 条，我们多渲染几条防止快速滚动时白屏
+      const VISIBLE_COUNT = Math.ceil(VIEWPORT_HEIGHT / ITEM_HEIGHT) + 4;
+
+      let listData = []; // 完整数据源
+      let isAutoScrolling = true; // 是否处于自动滚动状态
+      let rAFId = null;
+
+      // 获取 DOM 元素
+      const viewport = document.getElementById("viewport");
+      const phantom = document.getElementById("phantom");
+      const content = document.getElementById("content");
+      const statusText = document.getElementById("statusText");
+      const resumeBtn = document.getElementById("resumeBtn");
+
+      // --- 1. 初始化模拟数据 ---
+      for (let i = 1; i <= 30; i++) {
+        listData.push({
+          id: i,
+          text: `历史数据 - 第 ${i} 条`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      // --- 2. 核心渲染逻辑 ---
+      function render() {
+        const scrollTop = viewport.scrollTop;
+
+        // 计算当前滚动到了哪一条（起始索引）
+        const startIndex = Math.floor(scrollTop / ITEM_HEIGHT);
+        const endIndex = startIndex + VISIBLE_COUNT;
+
+        // 截取需要真实渲染的数据片段
+        const visibleData = listData.slice(startIndex, endIndex);
+
+        // 计算 translateY 偏移量 (抵消补偿)
+        // 注意：为了让滚动看起来完全平滑，我们要减去 (scrollTop % ITEM_HEIGHT) 导致的细微偏差？
+        // 不需要！因为我们是对父容器 absolute 定位做的 translateY，
+        // scrollTop 本身就在做像素级移动，我们只需要把容器整体“推”到 startIndex 的位置即可。
+        const offsetY = startIndex * ITEM_HEIGHT;
+
+        // 更新幽灵容器高度 (模拟万行数据的真实滚动条)
+        phantom.style.height = `${listData.length * ITEM_HEIGHT}px`;
+
+        // 更新真实内容容器的位移 (将其钉在可视区域)
+        content.style.transform = `translateY(${offsetY}px)`;
+
+        // 渲染真实 DOM
+        content.innerHTML = visibleData
+          .map(
+            (item) => `
+        <div class="list-item">
+          <span>${item.text}</span>
+          <span class="time">${item.time}</span>
+        </div>
+      `,
+          )
+          .join("");
+      }
+
+      // --- 3. 自动滚动机制 ---
+      function autoScroll() {
+        if (isAutoScrolling) {
+          const { scrollTop, clientHeight } = viewport;
+          const scrollHeight = phantom.scrollHeight;
+
+          // 触底检测公式 (加 1px 容差)
+          if (scrollTop + clientHeight >= scrollHeight - 1) {
+            // 【触底逻辑】：瞬间回到顶部，因为我们有虚拟列表，
+            // startIndex 会瞬间归零，用户视觉上会感觉回到了第一条
+            viewport.scrollTop = 0;
+          } else {
+            // 没触底，继续平滑滚动
+            viewport.scrollTop += 1;
+          }
+        }
+        rAFId = requestAnimationFrame(autoScroll);
+      }
+      // --- 4. 模拟 WebSocket 高频推数据 ---
+      // let pushCounter = listData.length;
+      // setInterval(() => {
+      //   pushCounter++;
+      //   // 推入新数据
+      //   listData.push({
+      //     id: pushCounter,
+      //     text: `🔥 WS 实时推流 - 第 ${pushCounter} 条`,
+      //     time: new Date().toLocaleTimeString()
+      //   });
+      //   // 注意：实际项目中这里应该是批量放入 Buffer 数组，而不是直接触发 render
+      //   // 这里为了 demo 简洁，只要是在非自动滚动状态下，推数据后也顺带更新一下幽灵高度
+      //   if(!isAutoScrolling) {
+      //     phantom.style.height = `${listData.length * ITEM_HEIGHT}px`;
+      //   }
+      // }, 500); // 每 500ms 推一条
+
+      // --- 5. 事件监听与状态接管 ---
+
+      // 监听外层滚动事件，驱动视图更新
+      viewport.addEventListener("scroll", () => {
+        render();
+      });
+
+      // 监听用户交互：鼠标滚轮、点击、触摸
+      const stopAutoScroll = () => {
+        if (isAutoScrolling) {
+          isAutoScrolling = false;
+          statusText.innerText = "状态: 用户接管 (已暂停)";
+          statusText.style.color = "#ff4d4f";
+        }
+      };
+
+      // 一旦用户进行这些操作，立即切断自动滚动，交还原生控制权
+      viewport.addEventListener("wheel", stopAutoScroll, { passive: true });
+      viewport.addEventListener("mousedown", stopAutoScroll);
+      viewport.addEventListener("touchstart", stopAutoScroll, {
+        passive: true,
+      });
+
+      // 恢复按钮逻辑
+      resumeBtn.addEventListener("click", () => {
+        isAutoScrolling = true;
+        statusText.innerText = "状态: 自动滚动中...";
+        statusText.style.color = "#555";
+        // 可选：恢复时直接跳到最新（底部）
+        // viewport.scrollTop = listData.length * ITEM_HEIGHT;
+      });
+
+      // --- 启动！ ---
+      render(); // 初始渲染
+      autoScroll(); // 启动引擎
+    </script>
+  </body>
+</html>
