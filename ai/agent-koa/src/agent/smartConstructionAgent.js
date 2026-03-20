@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { mcpRegistry } from '../mcp/mcpRegistry.js';
-import { checkpointSaver } from '../persistence/checkpointer.js';
+import { checkpointSaver, clearThreadCheckpoints } from '../persistence/checkpointer.js';
 import { toolRouter } from '../tooling/toolRouter.js';
 import { jsonSchemaToZod, normalizeRole, splitText } from '../utils/schema.js';
 
@@ -164,6 +164,24 @@ function extractTokenFromEvent(event) {
   return '';
 }
 
+function errorToMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isInvalidMessageRoleError(error) {
+  const message = errorToMessage(error);
+  if (!message) return false;
+  if (/Unknown message role/i.test(message)) return true;
+  if (/is not one of \['system', 'assistant', 'user', 'tool', 'function'\]/i.test(message)) return true;
+  if (/messages\.\[\d+\]\.role/i.test(message)) return true;
+  return false;
+}
+
+function shouldRecoverFromMessageRoleError(error, input) {
+  const threadId = typeof input?.threadId === 'string' ? input.threadId.trim() : '';
+  return Boolean(input?.persistThread && threadId && isInvalidMessageRoleError(error));
+}
+
 export class SmartConstructionAgentService {
   createThreadId() {
     return uuidv4();
@@ -252,7 +270,27 @@ export class SmartConstructionAgentService {
       };
     }
 
-    const result = await runtime.agent.invoke({ messages: runtime.messages }, runtime.config);
+    let result;
+    try {
+      result = await runtime.agent.invoke({ messages: runtime.messages }, runtime.config);
+    } catch (error) {
+      if (!shouldRecoverFromMessageRoleError(error, runtime.input)) {
+        throw error;
+      }
+
+      console.warn(
+        `[agent] message role corrupted, reset checkpoint and retry once. thread_id=${runtime.input.threadId}; error=${errorToMessage(error)}`,
+      );
+      clearThreadCheckpoints(runtime.input.threadId);
+      const retryRuntime = await this.buildRuntime(runtime.input);
+      result = await retryRuntime.agent.invoke({ messages: retryRuntime.messages }, retryRuntime.config);
+
+      return {
+        text: extractFinalAssistantText(result?.messages) || '未生成有效回复，请重试。',
+        selectedTools: retryRuntime.selectedTools,
+      };
+    }
+
     const text = extractFinalAssistantText(result?.messages) || '未生成有效回复，请重试。';
 
     return {
@@ -278,79 +316,96 @@ export class SmartConstructionAgentService {
       };
     }
 
-    const controller = new AbortController();
-    const config = {
-      ...runtime.config,
-      signal: controller.signal,
-      version: 'v2',
+    const streamOnce = async (activeRuntime) => {
+      const controller = new AbortController();
+      const config = {
+        ...activeRuntime.config,
+        signal: controller.signal,
+        version: 'v2',
+      };
+
+      let output = '';
+      let tokenCount = 0;
+      let toolCallCount = 0;
+      let activeToolCalls = 0;
+      let finalTextFromEvents = '';
+
+      const stream = await activeRuntime.agent.streamEvents({ messages: activeRuntime.messages }, config);
+
+      for await (const event of stream) {
+        const eventName = String(event?.event || '');
+
+        if (eventName === 'on_tool_start') {
+          toolCallCount += 1;
+          activeToolCalls += 1;
+          const toolEvent = buildToolEventPayload(event, activeRuntime.selectedTools);
+          if (onToolStart) onToolStart(toolEvent);
+
+          if (toolCallCount > env.AGENT_TOOL_MAX_CALLS) {
+            controller.abort();
+            throw new Error(`Tool call limit exceeded: ${env.AGENT_TOOL_MAX_CALLS}`);
+          }
+        }
+
+        if (eventName === 'on_tool_end') {
+          activeToolCalls = Math.max(0, activeToolCalls - 1);
+          const toolEvent = buildToolEventPayload(event, activeRuntime.selectedTools);
+          if (onToolEnd) onToolEnd(toolEvent);
+        }
+
+        if (eventName === 'on_chain_end') {
+          const maybeMessages = event?.data?.output?.messages;
+          const maybeText = extractFinalAssistantText(maybeMessages);
+          if (maybeText) {
+            finalTextFromEvents = maybeText;
+          }
+        }
+
+        if (activeToolCalls > 0 && (eventName === 'on_chat_model_stream' || eventName === 'on_llm_stream')) {
+          continue;
+        }
+
+        const token = extractTokenFromEvent(event);
+        if (!token) continue;
+        tokenCount += 1;
+        output += token;
+        if (onToken) onToken(token);
+      }
+
+      if (tokenCount > 0) {
+        return {
+          text: output.trim(),
+          selectedTools: activeRuntime.selectedTools,
+        };
+      }
+
+      if (finalTextFromEvents) {
+        if (onToken) {
+          for (const part of splitText(finalTextFromEvents, 20)) onToken(part);
+        }
+        return {
+          text: finalTextFromEvents,
+          selectedTools: activeRuntime.selectedTools,
+        };
+      }
+
+      throw new Error('模型响应流中断：未接收到有效内容。');
     };
 
-    let output = '';
-    let tokenCount = 0;
-    let toolCallCount = 0;
-    let activeToolCalls = 0;
-    let finalTextFromEvents = '';
-
-    const stream = await runtime.agent.streamEvents({ messages: runtime.messages }, config);
-
-    for await (const event of stream) {
-      const eventName = String(event?.event || '');
-
-      if (eventName === 'on_tool_start') {
-        toolCallCount += 1;
-        activeToolCalls += 1;
-        const toolEvent = buildToolEventPayload(event, runtime.selectedTools);
-        if (onToolStart) onToolStart(toolEvent);
-
-        if (toolCallCount > env.AGENT_TOOL_MAX_CALLS) {
-          controller.abort();
-          throw new Error(`Tool call limit exceeded: ${env.AGENT_TOOL_MAX_CALLS}`);
-        }
+    try {
+      return await streamOnce(runtime);
+    } catch (error) {
+      if (!shouldRecoverFromMessageRoleError(error, runtime.input)) {
+        throw error;
       }
 
-      if (eventName === 'on_tool_end') {
-        activeToolCalls = Math.max(0, activeToolCalls - 1);
-        const toolEvent = buildToolEventPayload(event, runtime.selectedTools);
-        if (onToolEnd) onToolEnd(toolEvent);
-      }
-
-      if (eventName === 'on_chain_end') {
-        const maybeMessages = event?.data?.output?.messages;
-        const maybeText = extractFinalAssistantText(maybeMessages);
-        if (maybeText) {
-          finalTextFromEvents = maybeText;
-        }
-      }
-
-      if (activeToolCalls > 0 && (eventName === 'on_chat_model_stream' || eventName === 'on_llm_stream')) {
-        continue;
-      }
-
-      const token = extractTokenFromEvent(event);
-      if (!token) continue;
-      tokenCount += 1;
-      output += token;
-      if (onToken) onToken(token);
+      console.warn(
+        `[agent] message role corrupted, reset checkpoint and retry once(stream). thread_id=${runtime.input.threadId}; error=${errorToMessage(error)}`,
+      );
+      clearThreadCheckpoints(runtime.input.threadId);
+      const retryRuntime = await this.buildRuntime(runtime.input);
+      return streamOnce(retryRuntime);
     }
-
-    if (tokenCount > 0) {
-      return {
-        text: output.trim(),
-        selectedTools: runtime.selectedTools,
-      };
-    }
-
-    if (finalTextFromEvents) {
-      if (onToken) {
-        for (const part of splitText(finalTextFromEvents, 20)) onToken(part);
-      }
-      return {
-        text: finalTextFromEvents,
-        selectedTools: runtime.selectedTools,
-      };
-    }
-
-    throw new Error('模型响应流中断：未接收到有效内容。');
   }
 }
 

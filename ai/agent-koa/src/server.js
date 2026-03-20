@@ -1,73 +1,86 @@
-﻿import cors from 'cors';
-import express from 'express';
-import morgan from 'morgan';
+import cors from '@koa/cors';
+import Koa from 'koa';
+import bodyParser from 'koa-bodyparser';
+import morgan from 'koa-morgan';
 import { env } from './config/env.js';
 import { mcpRegistry } from './mcp/mcpRegistry.js';
 import { checkpointSaver, sqlitePath } from './persistence/checkpointer.js';
-import { agentRouter } from './routes/agent.js';
-import { mcpAdminRouter } from './routes/mcpAdmin.js';
-import { openAICompatibleRouter } from './routes/openaiCompatible.js';
-import { rpcRouter } from './routes/rpc.js';
-import { threadsRouter } from './routes/threads.js';
+import { createApiRouter } from './routes/index.js';
 import { toolRouter } from './tooling/toolRouter.js';
 
-import './test/embedding.js'
+// import './test/embedding.js';
 
+const LOG_FORMAT = env.NODE_ENV === 'production' ? 'combined' : 'dev';
+const PUBLIC_PATHS = new Set(['/health']);
 
-const app = express();
+function createErrorMiddleware() {
+  return async (ctx, next) => {
+    try {
+      await next();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[server-error]', error);
+      ctx.status = 500;
+      ctx.body = { error: { message } };
+    }
+  };
+}
 
-app.use(cors());
-app.use(express.json({ limit: '2mb' }));
-app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+function createAuthMiddleware({ token, publicPaths }) {
+  return async (ctx, next) => {
+    if (!token || publicPaths.has(ctx.path)) {
+      await next();
+      return;
+    }
 
-app.use((req, res, next) => {
-  if (!env.AGENT_API_TOKEN) {
-    next();
-    return;
-  }
+    const authorization = ctx.get('authorization');
+    if (authorization === `Bearer ${token}`) {
+      await next();
+      return;
+    }
 
-  if (req.path === '/health') {
-    next();
-    return;
-  }
+    ctx.status = 401;
+    ctx.body = {
+      error: {
+        message: 'Unauthorized',
+      },
+    };
+  };
+}
 
-  const authorization = req.headers.authorization || '';
-  if (authorization === `Bearer ${env.AGENT_API_TOKEN}`) {
-    next();
-    return;
-  }
+function registerMiddlewares(app) {
+  app.use(cors());
+  app.use(bodyParser({ jsonLimit: '2mb' }));
+  app.use(morgan(LOG_FORMAT));
+  app.use(createErrorMiddleware());
+  app.use(
+    createAuthMiddleware({
+      token: env.AGENT_API_TOKEN,
+      publicPaths: PUBLIC_PATHS,
+    }),
+  );
+}
 
-  res.status(401).json({
-    error: {
-      message: 'Unauthorized',
-    },
+function registerRoutes(app) {
+  const apiRouter = createApiRouter({
+    env,
+    mcpRegistry,
+    toolRouter,
+    sqlitePath,
   });
-});
 
-app.get('/health', (_req, res) => {
-  res.json({
-    ok: true,
-    build: '2026-03-09-nav-direct-v1',
-    model: env.OPENAI_MODEL,
-    sqlite_path: sqlitePath,
-    active_mcp_servers: mcpRegistry.list().filter((item) => item.active).length,
-    tool_router: toolRouter.getStatus(),
-    time: new Date().toISOString(),
-  });
-});
+  app.use(apiRouter.routes());
+  app.use(apiRouter.allowedMethods());
+}
 
-app.use(agentRouter);
-app.use(threadsRouter);
-app.use(openAICompatibleRouter);
-app.use(mcpAdminRouter);
-app.use(rpcRouter);
+function createApp() {
+  const app = new Koa();
+  registerMiddlewares(app);
+  registerRoutes(app);
+  return app;
+}
 
-app.use((err, _req, res, _next) => {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error('[server-error]', err);
-  res.status(500).json({ error: { message } });
-});
-
+const app = createApp();
 let server = null;
 
 async function bootstrap() {

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import Router from '@koa/router';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { env } from '../config/env.js';
@@ -40,18 +40,19 @@ function extractLatestUserMessage(messages) {
   return null;
 }
 
-export const openAICompatibleRouter = Router();
+export const openAICompatibleRouter = new Router();
 
-openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
-  const parsed = requestSchema.safeParse(req.body);
+openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
+  const parsed = requestSchema.safeParse(ctx.request.body);
   if (!parsed.success) {
-    res.status(400).json({
+    ctx.status = 400;
+    ctx.body = {
       error: {
         message: 'Invalid request body',
         type: 'invalid_request_error',
         details: parsed.error.flatten(),
       },
-    });
+    };
     return;
   }
 
@@ -80,7 +81,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
       conversationStore.appendMessage(threadId, 'assistant', result.text);
     }
 
-    res.json({
+    ctx.body = {
       id,
       object: 'chat.completion',
       created,
@@ -97,12 +98,12 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
         completion_tokens: null,
         total_tokens: null,
       },
-    });
+    };
     return;
   }
 
-  prepareSSE(res);
-  res.write(
+  prepareSSE(ctx);
+  ctx.res.write(
     `data: ${JSON.stringify({
       id,
       object: 'chat.completion.chunk',
@@ -122,7 +123,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
       messages,
       persistThread,
       onToken: (token) => {
-        res.write(
+        ctx.res.write(
           `data: ${JSON.stringify({
             id,
             object: 'chat.completion.chunk',
@@ -138,7 +139,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
       conversationStore.appendMessage(threadId, 'assistant', result.text);
     }
 
-    res.write(
+    ctx.res.write(
       `data: ${JSON.stringify({
         id,
         object: 'chat.completion.chunk',
@@ -147,10 +148,10 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
         choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
       })}\n\n`,
     );
-    res.write('data: [DONE]\n\n');
+    ctx.res.write('data: [DONE]\n\n');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    res.write(
+    ctx.res.write(
       `data: ${JSON.stringify({
         id,
         object: 'chat.completion.chunk',
@@ -160,8 +161,8 @@ openAICompatibleRouter.post('/v1/chat/completions', async (req, res) => {
         error: { message },
       })}\n\n`,
     );
-    res.write('data: [DONE]\n\n');
+    ctx.res.write('data: [DONE]\n\n');
   }
 
-  endSSE(res);
+  endSSE(ctx);
 });

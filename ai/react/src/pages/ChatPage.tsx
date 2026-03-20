@@ -72,9 +72,7 @@ export default function ChatPage() {
         />
         {chat.error ? <div className="status-error">{chat.error}</div> : null}
         <ChatComposer
-          value={chat.draft}
           sending={chat.sending}
-          onChange={chat.setDraft}
           onSend={chat.sendMessage}
           onStop={chat.stopStreaming}
         />

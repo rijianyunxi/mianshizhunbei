@@ -1,4 +1,4 @@
-import { Router } from 'express';
+锘縤mport Router from '@koa/router';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { conversationStore } from '../persistence/conversations.js';
@@ -36,7 +36,7 @@ const agentChatSchema = z
 
 function withSiteContext(input, siteContext) {
   if (!siteContext) return input;
-  return `${input}\n\n[工地上下文]\n${JSON.stringify(siteContext, null, 2)}`;
+  return `${input}\n\n[宸ュ湴涓婁笅鏂嘳\n${JSON.stringify(siteContext, null, 2)}`;
 }
 
 function resolveMessages(payload) {
@@ -62,15 +62,16 @@ function extractLatestUserMessage(messages) {
   return null;
 }
 
-export const agentRouter = Router();
+export const agentRouter = new Router();
 
-agentRouter.post('/agent/chat', async (req, res) => {
-  const parsed = agentChatSchema.safeParse(req.body);
+agentRouter.post('/agent/chat', async (ctx) => {
+  const parsed = agentChatSchema.safeParse(ctx.request.body);
   if (!parsed.success) {
-    res.status(400).json({
+    ctx.status = 400;
+    ctx.body = {
       error: 'Invalid request body',
       details: parsed.error.flatten(),
-    });
+    };
     return;
   }
 
@@ -92,7 +93,7 @@ agentRouter.post('/agent/chat', async (req, res) => {
 
     conversationStore.appendMessage(threadId, 'assistant', result.text);
 
-    res.json({
+    ctx.body = {
       thread_id: threadId,
       reply: result.text,
       selected_tools: result.selectedTools.map((tool) => ({
@@ -100,12 +101,12 @@ agentRouter.post('/agent/chat', async (req, res) => {
         server_id: tool.serverId,
         name: tool.name,
       })),
-    });
+    };
     return;
   }
 
-  prepareSSE(res);
-  sendSSEData(res, { type: 'start', thread_id: threadId });
+  prepareSSE(ctx);
+  sendSSEData(ctx, { type: 'start', thread_id: threadId });
 
   try {
     if (latestUserMessage) {
@@ -117,10 +118,10 @@ agentRouter.post('/agent/chat', async (req, res) => {
       messages,
       persistThread: true,
       onToken: (token) => {
-        sendSSEData(res, { type: 'delta', thread_id: threadId, delta: token });
+        sendSSEData(ctx, { type: 'delta', thread_id: threadId, delta: token });
       },
       onToolStart: ({ name, runtimeName, serverId, toolName, input }) => {
-        sendSSEData(res, {
+        sendSSEData(ctx, {
           type: 'tool_start',
           thread_id: threadId,
           tool: name,
@@ -131,7 +132,7 @@ agentRouter.post('/agent/chat', async (req, res) => {
         });
       },
       onToolEnd: ({ name, runtimeName, serverId, toolName }) => {
-        sendSSEData(res, {
+        sendSSEData(ctx, {
           type: 'tool_end',
           thread_id: threadId,
           tool: name,
@@ -144,7 +145,7 @@ agentRouter.post('/agent/chat', async (req, res) => {
 
     conversationStore.appendMessage(threadId, 'assistant', result.text);
 
-    sendSSEData(res, {
+    sendSSEData(ctx, {
       type: 'done',
       thread_id: threadId,
       selected_tools: result.selectedTools.map((tool) => ({
@@ -155,8 +156,8 @@ agentRouter.post('/agent/chat', async (req, res) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    sendSSEData(res, { type: 'error', thread_id: threadId, error: message });
+    sendSSEData(ctx, { type: 'error', thread_id: threadId, error: message });
   }
 
-  endSSE(res);
+  endSSE(ctx);
 });

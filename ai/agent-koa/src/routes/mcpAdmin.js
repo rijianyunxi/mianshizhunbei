@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+﻿import Router from '@koa/router';
 import { z } from 'zod';
 import { mcpRegistry } from '../mcp/mcpRegistry.js';
 import { toolRouter } from '../tooling/toolRouter.js';
@@ -17,16 +17,17 @@ const disableSchema = z.object({
   id: z.string().min(1),
 });
 
-export const mcpAdminRouter = Router();
+export const mcpAdminRouter = new Router();
 
-mcpAdminRouter.get('/admin/mcp/servers', async (_req, res) => {
-  res.json({ servers: mcpRegistry.list(), router: toolRouter.getStatus() });
+mcpAdminRouter.get('/admin/mcp/servers', async (ctx) => {
+  ctx.body = { servers: mcpRegistry.list(), router: toolRouter.getStatus() };
 });
 
-mcpAdminRouter.post('/admin/mcp/servers/enable', async (req, res) => {
-  const parsed = enableSchema.safeParse(req.body);
+mcpAdminRouter.post('/admin/mcp/servers/enable', async (ctx) => {
+  const parsed = enableSchema.safeParse(ctx.request.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
+    ctx.status = 400;
+    ctx.body = { error: parsed.error.flatten() };
     return;
   }
 
@@ -46,7 +47,7 @@ mcpAdminRouter.post('/admin/mcp/servers/enable', async (req, res) => {
   const connection = await mcpRegistry.enable(payload.id, override);
   const routerState = await toolRouter.rebuildIndex();
 
-  res.json({
+  ctx.body = {
     ok: true,
     server: {
       id: connection.id,
@@ -55,29 +56,30 @@ mcpAdminRouter.post('/admin/mcp/servers/enable', async (req, res) => {
       connected_at: connection.connectedAt,
     },
     router: routerState,
-  });
+  };
 });
 
-mcpAdminRouter.post('/admin/mcp/servers/disable', async (req, res) => {
-  const parsed = disableSchema.safeParse(req.body);
+mcpAdminRouter.post('/admin/mcp/servers/disable', async (ctx) => {
+  const parsed = disableSchema.safeParse(ctx.request.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
+    ctx.status = 400;
+    ctx.body = { error: parsed.error.flatten() };
     return;
   }
 
   const ok = await mcpRegistry.disable(parsed.data.id);
   const routerState = await toolRouter.rebuildIndex();
 
-  res.json({ ok, router: routerState });
+  ctx.body = { ok, router: routerState };
 });
 
-mcpAdminRouter.post('/admin/mcp/reindex', async (_req, res) => {
+mcpAdminRouter.post('/admin/mcp/reindex', async (ctx) => {
   const status = await toolRouter.rebuildIndex();
-  res.json({ ok: true, router: status });
+  ctx.body = { ok: true, router: status };
 });
 
-mcpAdminRouter.get('/admin/mcp/tools', async (_req, res) => {
-  res.json({
+mcpAdminRouter.get('/admin/mcp/tools', async (ctx) => {
+  ctx.body = {
     tools: mcpRegistry.getToolDescriptors().map((tool) => ({
       key: tool.key,
       runtime_name: tool.runtimeName,
@@ -87,5 +89,5 @@ mcpAdminRouter.get('/admin/mcp/tools', async (_req, res) => {
       input_schema: tool.inputSchema,
     })),
     router: toolRouter.getStatus(),
-  });
+  };
 });

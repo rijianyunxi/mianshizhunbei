@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import Router from '@koa/router';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
 import { conversationStore } from '../persistence/conversations.js';
@@ -15,68 +15,74 @@ const createThreadSchema = z.object({
   title: z.string().max(200).optional(),
 });
 
-export const threadsRouter = Router();
+export const threadsRouter = new Router();
 
-threadsRouter.get('/agent/threads', (req, res) => {
-  const parsed = listThreadsSchema.safeParse(req.query);
+threadsRouter.get('/agent/threads', (ctx) => {
+  const parsed = listThreadsSchema.safeParse(ctx.query);
   if (!parsed.success) {
-    res.status(400).json({
+    ctx.status = 400;
+    ctx.body = {
       error: 'Invalid query',
       details: parsed.error.flatten(),
-    });
+    };
     return;
   }
 
   const items = conversationStore.listConversations(parsed.data.limit);
-  res.json({ items });
+  ctx.body = { items };
 });
 
-threadsRouter.post('/agent/threads', (req, res) => {
-  const parsed = createThreadSchema.safeParse(req.body || {});
+threadsRouter.post('/agent/threads', (ctx) => {
+  const parsed = createThreadSchema.safeParse(ctx.request.body || {});
   if (!parsed.success) {
-    res.status(400).json({
+    ctx.status = 400;
+    ctx.body = {
       error: 'Invalid request body',
       details: parsed.error.flatten(),
-    });
+    };
     return;
   }
 
   const threadId = smartConstructionAgent.createThreadId();
   const item = conversationStore.createConversation(threadId, parsed.data.title);
 
-  res.status(201).json({
+  ctx.status = 201;
+  ctx.body = {
     thread_id: threadId,
     item,
-  });
+  };
 });
 
-threadsRouter.get('/agent/threads/:threadId/messages', (req, res) => {
-  const parsed = listMessagesSchema.safeParse(req.query);
+threadsRouter.get('/agent/threads/:threadId/messages', (ctx) => {
+  const parsed = listMessagesSchema.safeParse(ctx.query);
   if (!parsed.success) {
-    res.status(400).json({
+    ctx.status = 400;
+    ctx.body = {
       error: 'Invalid query',
       details: parsed.error.flatten(),
-    });
+    };
     return;
   }
 
-  const threadId = String(req.params.threadId || '').trim();
+  const threadId = String(ctx.params.threadId || '').trim();
   if (!threadId) {
-    res.status(400).json({ error: 'threadId is required' });
+    ctx.status = 400;
+    ctx.body = { error: 'threadId is required' };
     return;
   }
 
   const items = conversationStore.listMessages(threadId, parsed.data.limit);
-  res.json({ thread_id: threadId, items });
+  ctx.body = { thread_id: threadId, items };
 });
 
-threadsRouter.delete('/agent/threads/:threadId', (req, res) => {
-  const threadId = String(req.params.threadId || '').trim();
+threadsRouter.delete('/agent/threads/:threadId', (ctx) => {
+  const threadId = String(ctx.params.threadId || '').trim();
   if (!threadId) {
-    res.status(400).json({ error: 'threadId is required' });
+    ctx.status = 400;
+    ctx.body = { error: 'threadId is required' };
     return;
   }
 
   conversationStore.deleteConversation(threadId);
-  res.status(204).end();
+  ctx.status = 204;
 });

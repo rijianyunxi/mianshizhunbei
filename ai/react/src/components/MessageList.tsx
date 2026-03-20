@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { ZH_TEXT } from '../app/copy'
 import type { ChatMessage, ChatMessageToolTrace, ToolStatusItem } from '../app/types'
@@ -88,7 +88,7 @@ function MessageToolTrace(props: { trace?: ChatMessageToolTrace }) {
   )
 }
 
-export function MessageList(props: MessageListProps) {
+export const MessageList = memo(function MessageList(props: MessageListProps) {
   const virtuosoRef = useRef<VirtuosoHandle | null>(null)
 
   const rows = useMemo<ChatMessage[]>(() => props.messages, [props.messages])
@@ -168,4 +168,4 @@ export function MessageList(props: MessageListProps) {
       />
     </section>
   )
-}
+})

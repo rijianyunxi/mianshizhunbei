@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+﻿import Router from '@koa/router';
 import { z } from 'zod';
 import { mcpRegistry } from '../mcp/mcpRegistry.js';
 
@@ -8,27 +8,29 @@ const callSchema = z.object({
   arguments: z.record(z.string(), z.any()).optional().default({}),
 });
 
-export const rpcRouter = Router();
+export const rpcRouter = new Router();
 
-rpcRouter.post('/rpc/mcp/call', async (req, res) => {
-  const parsed = callSchema.safeParse(req.body);
+rpcRouter.post('/rpc/mcp/call', async (ctx) => {
+  const parsed = callSchema.safeParse(ctx.request.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
+    ctx.status = 400;
+    ctx.body = { error: parsed.error.flatten() };
     return;
   }
 
   try {
     const payload = parsed.data;
     const result = await mcpRegistry.callTool(payload.server_id, payload.tool_name, payload.arguments);
-    res.json({
+    ctx.body = {
       ok: !result.isError,
       server_id: payload.server_id,
       tool_name: payload.tool_name,
       text: result.text,
       raw: result.raw,
-    });
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ ok: false, error: message });
+    ctx.status = 500;
+    ctx.body = { ok: false, error: message };
   }
 });

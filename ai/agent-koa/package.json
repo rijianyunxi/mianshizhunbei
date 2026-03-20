@@ -1,7 +1,7 @@
 {
   "name": "agent-koa",
   "version": "1.0.0",
-  "description": "Express + LangGraph + MCP agent server for smart construction scenarios.",
+  "description": "Koa + LangGraph + MCP agent server for smart construction scenarios.",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -16,6 +16,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^13.1.0",
     "@langchain/core": "^1.1.31",
     "@langchain/langgraph": "^1.2.1",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.1",
@@ -23,11 +25,11 @@
     "@langchain/openai": "^1.2.12",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "better-sqlite3": "^12.6.2",
-    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1",
+    "koa": "^2.16.1",
+    "koa-bodyparser": "^4.4.1",
+    "koa-morgan": "^1.0.1",
     "langchain": "^1.2.30",
-    "morgan": "^1.10.1",
     "uuid": "^13.0.0",
     "zod": "^4.3.6"
   }

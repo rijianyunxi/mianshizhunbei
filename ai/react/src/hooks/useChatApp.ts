@@ -35,14 +35,12 @@ type UseChatAppResult = {
   messagesLoading: boolean
   messages: ChatMessage[]
   threadId: string
-  draft: string
   sending: boolean
   error: string
   streamingMessageId: string | null
   settingsOpen: boolean
   mcp: UseMcpAdminResult
-  setDraft: (value: string) => void
-  sendMessage: () => Promise<void>
+  sendMessage: (content: string) => Promise<void>
   stopStreaming: () => void
   clearConversation: () => void
   createConversation: () => Promise<void>
@@ -84,7 +82,6 @@ export function useChatApp(): UseChatAppResult {
   const [conversationsLoading, setConversationsLoading] = useState(false)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
@@ -266,8 +263,8 @@ export function useChatApp(): UseChatAppResult {
     return /ERR_CONNECTION_RESET|Failed to fetch|NetworkError|socket hang up/i.test(message)
   }, [])
 
-  const sendMessage = useCallback(async () => {
-    const content = draft.trim()
+  const sendMessage = useCallback(async (rawContent: string) => {
+    const content = String(rawContent ?? '').trim()
     if (!content || sending) {
       return
     }
@@ -433,7 +430,6 @@ export function useChatApp(): UseChatAppResult {
     }
 
     setMessages(nextMessages)
-    setDraft('')
     setSending(true)
     setStreamingMessageId(assistantMessage.id)
 
@@ -555,7 +551,6 @@ export function useChatApp(): UseChatAppResult {
       }
     }
   }, [
-    draft,
     formatToolInputDetail,
     messages,
     refreshConversations,
@@ -600,13 +595,11 @@ export function useChatApp(): UseChatAppResult {
     messagesLoading,
     messages,
     threadId,
-    draft,
     sending,
     error,
     streamingMessageId,
     settingsOpen,
     mcp,
-    setDraft,
     sendMessage,
     stopStreaming,
     clearConversation,

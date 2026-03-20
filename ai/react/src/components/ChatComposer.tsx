@@ -1,25 +1,39 @@
-import type { FormEvent, KeyboardEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ZH_TEXT } from '../app/copy'
 import { PlusIcon, SlidersIcon, StopIcon } from './icons'
 
 type ChatComposerProps = {
-  value: string
   sending: boolean
-  onChange: (value: string) => void
-  onSend: () => Promise<void>
+  onSend: (content: string) => Promise<void>
   onStop: () => void
 }
 
 export function ChatComposer(props: ChatComposerProps) {
+  const [value, setValue] = useState('')
+
+  const submitCurrent = async () => {
+    const next = value.trim()
+    if (!next || props.sending) {
+      return
+    }
+
+    setValue('')
+    try {
+      await props.onSend(next)
+    } catch {
+      setValue((current) => (current ? current : next))
+    }
+  }
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    void props.onSend()
+    void submitCurrent()
   }
 
   const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      void props.onSend()
+      void submitCurrent()
     }
   }
 
@@ -27,8 +41,8 @@ export function ChatComposer(props: ChatComposerProps) {
     <form className="composer" onSubmit={onSubmit}>
       <div className="composer-shell">
         <textarea
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
           onKeyDown={onComposerKeyDown}
           rows={2}
           placeholder={ZH_TEXT.composerPlaceholder}
