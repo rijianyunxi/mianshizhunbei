@@ -1,5 +1,5 @@
-// core.ts
 import type { SDKOptions, ErrorPayload, Integration } from "./types";
+import { getPageUrl } from "../utils/context";
 
 export class ErrorTracker {
   private options: SDKOptions;
@@ -9,36 +9,83 @@ export class ErrorTracker {
   constructor(options: SDKOptions) {
     if (!options.dsn) throw new Error("ErrorTracker: dsn is required!");
     this.options = options;
-    
-    // 【核心改造】不再硬编码 initGlobalListeners，而是遍历执行传入的 integrations
     this.setupIntegrations();
   }
 
   private setupIntegrations() {
     const integrations = this.options.integrations || [];
-    integrations.forEach((integration) => {
+    integrations.forEach((integration: Integration) => {
       integration.setup(this);
     });
   }
 
-  // ... setUser, setTag, clearUser 保持不变 ...
-
-  // 【新增】暴露一个底层的捕获方法，供各个 Integration 内部调用
-  public capture(payload: Partial<ErrorPayload>) {
-    this.captureEvent(payload);
+  public setUser(user: Record<string, any>) {
+    this.userContext = { ...this.userContext, ...user };
   }
 
-  // 暴露给用户手动调用的
+  public setTag(key: string, value: string) {
+    this.tagsContext[key] = value;
+  }
+
+  public clearUser() {
+    this.userContext = {};
+  }
+
+  // 手动处理错误，比如被try catch后的以及业务错误
   public captureException(error: Error, extraInfo?: Record<string, any>) {
-    this.captureEvent({
+    this.processPayload({
       type: "manual_error",
       message: error.message,
       stack: error.stack,
       extra: extraInfo,
     });
   }
+  // 核心底座，所有错误在这里数据整合发送
+  public processPayload(partialEvent: Partial<ErrorPayload>) {
+    console.error(partialEvent);
+    
+    let finalEvent: ErrorPayload = {
+      type: partialEvent.type || "unknown_error",
+      message: partialEvent.message || "",
+      stack: partialEvent.stack || null,
+      filename: partialEvent.filename || "",
+      lineno: partialEvent.lineno || 0,
+      colno: partialEvent.colno || 0,
+      time: new Date().getTime(),
+      url: partialEvent.url || getPageUrl(),
+      appVersion: this.options.appVersion,
+      environment: this.options.environment,
+      user: this.userContext,
+      tags: this.tagsContext,
+      extra: partialEvent.extra || {},
+    };
 
-  // captureEvent 和 send 方法的内部逻辑保持你的原样即可
-  private captureEvent(partialEvent: Partial<ErrorPayload>) { /* ... */ }
-  private send(payload: ErrorPayload) { /* ... */ }
+    // 执行 beforeSend 钩子
+    if (typeof this.options.beforeSend === "function") {
+      const processedEvent = this.options.beforeSend(finalEvent);
+      if (processedEvent === null) {
+        console.warn("[ErrorTracker] Event dropped by beforeSend hook.");
+        return;
+      }
+      finalEvent = processedEvent;
+    }
+    this.send(finalEvent);
+  }
+
+  private send(payload: ErrorPayload) {
+    const data = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(this.options.dsn, data);
+    } else {
+      fetch(this.options.dsn, {
+        method: "POST",
+        body: data,
+        keepalive: true,
+        headers: { 
+          "Content-Type": "application/json",
+          "X-SDK-Injected": "true",
+         },
+      }).catch(console.error);
+    }
+  }
 }
