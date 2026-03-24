@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      web-vitals:
+        specifier: ^5.1.0
+        version: 5.1.0
     devDependencies:
       html-webpack-plugin:
         specifier: ^5.6.6
@@ -1418,6 +1422,9 @@ packages:
 
   wbuf@1.7.3:
     resolution: {integrity: sha512-O84QOnr0icsbFGLS0O3bI5FswxzRr8/gHwWkDlQFskhSPryQXvrTMxjxGP4+iWYoauLoBvfDpkrOauZ+0iZpDA==}
+
+  web-vitals@5.1.0:
+    resolution: {integrity: sha512-ArI3kx5jI0atlTtmV0fWU3fjpLmq/nD3Zr1iFFlJLaqa5wLBkUSzINwBPySCX/8jRyjlmy1Volw1kz1g9XE4Jg==}
 
   webpack-cli@7.0.2:
     resolution: {integrity: sha512-dB0R4T+C/8YuvM+fabdvil6QE44/ChDXikV5lOOkrUeCkW5hTJv2pGLE3keh+D5hjYw8icBaJkZzpFoaHV4T+g==}
@@ -3008,6 +3015,8 @@ snapshots:
   wbuf@1.7.3:
     dependencies:
       minimalistic-assert: 1.0.1
+
+  web-vitals@5.1.0: {}
 
   webpack-cli@7.0.2(webpack-dev-server@5.2.3)(webpack@5.105.4):
     dependencies:
