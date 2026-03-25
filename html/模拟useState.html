@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+
+
+    <button onclick="testClick()">testClick</button>
+    <script>
+      // ==========================================
+      // 1. 模拟 React 运行时的全局变量
+      // ==========================================
+      let isMount = true; // 标记当前是“首次渲染”还是“更新渲染”
+      let workInProgressHook = null; // 指针：当前正在执行的那个 Hook
+
+      // 模拟当前正在渲染的 Fiber 节点
+      const fiber = {
+        memoizedState: null, // 指向 Hook 链表的头节点
+        stateNode: App, // 假装它绑定了我们的 App 组件
+      };
+
+      // ==========================================
+      // 2. 核心 useState 实现
+      // ==========================================
+      function useState(initialState) {
+        let hook;
+
+        if (isMount) {
+          // 【首次渲染】：新建 Hook 对象，并把它们串成单向链表
+          hook = {
+            memoizedState: initialState, // 保存当前状态
+            next: null, // 指向下一个 Hook
+            queue: { pending: [] }, // 更新队列（源码是环形链表，这里为了极简用数组代替）
+          };
+
+          if (!fiber.memoizedState) {
+            fiber.memoizedState = hook; // 如果是第一个 Hook，挂在 Fiber 头节点上
+          } else {
+            workInProgressHook.next = hook; // 否则，挂在上一个 Hook 的 next 后面
+          }
+          workInProgressHook = hook; // 移动指针到当前 Hook
+        } else {
+          // 【更新渲染】：顺着链表往下走，捞出对应的那个旧 Hook
+          hook = workInProgressHook;
+          workInProgressHook = workInProgressHook.next; // 指针后移，为下一个 useState 腾位置
+        }
+
+        // --- 关键步骤：计算新状态 ---
+        let baseState = hook.memoizedState;
+
+        // 如果队列里有没执行完的 setState 动作，在这里集中清算
+        if (hook.queue.pending.length > 0) {
+          for (let action of hook.queue.pending) {
+            // 兼容 setCount(1) 和 setCount(c => c + 1) 两种写法
+            baseState =
+              typeof action === "function" ? action(baseState) : action;
+          }
+          hook.queue.pending = []; // 计算完毕，清空队列
+        }
+
+        hook.memoizedState = baseState; // 把计算出的最新值存回 Hook 本身
+
+        // --- 派发函数 (setCount) ---
+        const dispatch = (action) => {
+          // set 函数被调用时，绝不立刻改状态！而是把动作塞进队列里
+          hook.queue.pending.push(action);
+          // 然后通知 React 重新渲染
+          schedule();
+        };
+
+        return [baseState, dispatch];
+      }
+
+      // ==========================================
+      // 3. 模拟 React 的调度与渲染执行
+      // ==========================================
+      function schedule() {
+        // 每次重新渲染前，要把指针重置到链表头部
+        workInProgressHook = fiber.memoizedState;
+        // 标记为更新阶段
+        isMount = false;
+
+        // 重新执行一次组件函数
+        console.log("--- 开始重新渲染 ---");
+        fiber.stateNode();
+      }
+
+      // ==========================================
+      // 4. 业务代码测试
+      // ==========================================
+      function App() {
+        const [count, setCount] = useState(0);
+        const [name, setName] = useState("初始名字");
+
+        console.log(`当前状态 -> count: ${count}, name: ${name}`);
+
+        // 为了演示，我们把 set 函数暴露到全局，模拟用户点击按钮
+        window.testClick = () => {
+          console.log("--- 模拟用户点击 ---");
+          setCount(count + 1);
+          setCount((c) => c + 10); // 连续调用，测试队列批处理
+          setName("新名字");
+        };
+      }
+
+      // ==========================================
+      // 5. 启动应用
+      // ==========================================
+      console.log("--- 首次挂载 ---");
+      App(); // 初始化执行
+    </script>
+  </body>
+</html>
