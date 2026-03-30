@@ -1,22 +1,44 @@
 {
-  "name": "monitor",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "start": "webpack serve --open",
-    "build": "webpack"
+  "name": "oh-my-monitor-sdk",
+  "version": "0.0.1",
+  "description": "Cross-platform monitoring SDK for browser, Vue, and mini-program applications.",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    }
   },
-  "keywords": [],
+  "sideEffects": false,
+  "scripts": {
+    "build": "npm run build:types && npm run build:js",
+    "build:js": "webpack --mode production",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "monitor",
+    "sdk",
+    "error-monitoring",
+    "performance",
+    "browser",
+    "vue",
+    "miniprogram"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "html-webpack-plugin": "^5.6.6",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "webpack": "^5.105.4",
-    "webpack-cli": "^7.0.2",
-    "webpack-dev-server": "^5.2.3"
+    "webpack-cli": "^7.0.2"
   },
   "dependencies": {
     "web-vitals": "^5.1.0"

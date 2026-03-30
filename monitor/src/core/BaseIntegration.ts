@@ -1,4 +1,5 @@
 import type { TrackerInstance } from "./types";
+import { sdkError } from "./logger";
 
 export abstract class BaseIntegration {
   public abstract readonly name: string;
@@ -18,7 +19,7 @@ export abstract class BaseIntegration {
     } catch (error) {
       this.trackerInstance = null;
       this.isSetup = false;
-      console.error(`[MonitorSDK] integration "${this.name}" setup failed.`, error);
+      sdkError(`integration "${this.name}" setup failed.`, error);
     }
   }
 
@@ -30,10 +31,7 @@ export abstract class BaseIntegration {
     try {
       this.teardownCore(this.trackerInstance);
     } catch (error) {
-      console.error(
-        `[MonitorSDK] integration "${this.name}" dispose failed.`,
-        error,
-      );
+      sdkError(`integration "${this.name}" dispose failed.`, error);
     } finally {
       this.trackerInstance = null;
       this.isSetup = false;

@@ -1,6 +1,9 @@
 import { BaseIntegration } from "../core/BaseIntegration";
 import { EVENT_KIND, EVENT_TYPE } from "../core/types";
 import type { TrackerInstance } from "../core/types";
+import {
+  shouldSkipMonitoringRequest,
+} from "../utils/request";
 
 /**
  * XhrIntegration 配置项。
@@ -38,6 +41,7 @@ type XhrMetadata = {
   url: string;
   start: number;
   requestData?: unknown;
+  headers: Record<string, string>;
 };
 
 export class XhrIntegration extends BaseIntegration {
@@ -68,6 +72,7 @@ export class XhrIntegration extends BaseIntegration {
     const integration = this;
     const originalOpen = XMLHttpRequest.prototype.open;
     const originalSend = XMLHttpRequest.prototype.send;
+    const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
     const dsn = tracker.getDsn();
 
     XMLHttpRequest.prototype.open = function (
@@ -83,9 +88,25 @@ export class XhrIntegration extends BaseIntegration {
         method: method.toUpperCase(),
         url: url.toString(),
         start: performance.now(),
+        headers: {},
       };
 
       return originalOpen.apply(this, [method, url, ...args] as any);
+    };
+
+    XMLHttpRequest.prototype.setRequestHeader = function (
+      name: string,
+      value: string,
+    ) {
+      const xhr = this as XMLHttpRequest & {
+        _monitorMetadata?: XhrMetadata;
+      };
+
+      if (xhr._monitorMetadata) {
+        xhr._monitorMetadata.headers[name] = value;
+      }
+
+      return originalSetRequestHeader.apply(this, [name, value]);
     };
 
     XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
@@ -100,7 +121,10 @@ export class XhrIntegration extends BaseIntegration {
           : undefined;
       }
 
-      if (metadata && integration.shouldSkipUrl(metadata.url, dsn)) {
+      if (
+        metadata &&
+        integration.shouldSkipRequest(metadata.url, dsn, metadata.headers)
+      ) {
         return originalSend.apply(this, [body] as any);
       }
 
@@ -136,19 +160,16 @@ export class XhrIntegration extends BaseIntegration {
     };
   }
 
-  private shouldSkipUrl(url: string, dsn: string): boolean {
-    if (url.includes(dsn)) {
-      return true;
-    }
-
-    return this.options.ignoreUrls.some((rule) => this.matchesUrlRule(url, rule));
-  }
-
-  private matchesUrlRule(url: string, rule: string | RegExp): boolean {
-    if (typeof rule === "string") {
-      return url.includes(rule);
-    }
-
-    return rule.test(url);
+  private shouldSkipRequest(
+    url: string,
+    dsn: string,
+    headers?: Record<string, string>,
+  ): boolean {
+    return shouldSkipMonitoringRequest({
+      url,
+      dsn,
+      headers,
+      ignoreUrls: this.options.ignoreUrls,
+    });
   }
 }

@@ -1,6 +1,10 @@
 import { BaseIntegration } from "../core/BaseIntegration";
 import { EVENT_KIND, EVENT_TYPE } from "../core/types";
 import type { TrackerInstance } from "../core/types";
+import {
+  isSdkInjectedRequest,
+  shouldSkipMonitoringRequest,
+} from "../utils/request";
 
 /**
  * FetchIntegration 配置项。
@@ -178,61 +182,21 @@ export class FetchIntegration extends BaseIntegration {
     input: RequestInfo | URL,
     init?: RequestInit,
   ): boolean {
-    if (url.includes(dsn)) {
+    if (
+      shouldSkipMonitoringRequest({
+        url,
+        dsn,
+        headers: init?.headers,
+        ignoreUrls: this.options.ignoreUrls,
+      })
+    ) {
       return true;
     }
 
-    if (this.options.ignoreUrls.some((rule) => this.matchesUrlRule(url, rule))) {
-      return true;
-    }
-
-    const injectedHeader = this.extractHeader("X-SDK-Injected", init?.headers);
-    if (injectedHeader) {
-      return true;
-    }
-
-    if (typeof Request !== "undefined" && input instanceof Request) {
-      const requestInjectedHeader = input.headers.get("X-SDK-Injected");
-      if (requestInjectedHeader) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private extractHeader(
-    key: string,
-    headers?: HeadersInit,
-  ): string | null {
-    if (!headers) {
-      return null;
-    }
-
-    if (headers instanceof Headers) {
-      return headers.get(key);
-    }
-
-    if (Array.isArray(headers)) {
-      const match = headers.find(([headerKey]) =>
-        headerKey.toLowerCase() === key.toLowerCase(),
-      );
-      return match ? match[1] : null;
-    }
-
-    const headerRecord = headers as Record<string, string>;
-    const matchedKey = Object.keys(headerRecord).find(
-      (headerKey) => headerKey.toLowerCase() === key.toLowerCase(),
+    return (
+      typeof Request !== "undefined" &&
+      input instanceof Request &&
+      isSdkInjectedRequest(input.headers)
     );
-
-    return matchedKey ? headerRecord[matchedKey] : null;
-  }
-
-  private matchesUrlRule(url: string, rule: string | RegExp): boolean {
-    if (typeof rule === "string") {
-      return url.includes(rule);
-    }
-
-    return rule.test(url);
   }
 }

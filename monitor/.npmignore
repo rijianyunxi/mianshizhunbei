@@ -1,0 +1,11 @@
+src/
+node_modules/
+.idea/
+.vscode/
+
+coverage/
+dist/**/*.map
+
+tsconfig.json
+webpack.config.js
+pnpm-lock.yaml

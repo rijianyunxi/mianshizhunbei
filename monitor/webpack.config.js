@@ -1,35 +1,77 @@
 const path = require("path");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
 
-module.exports = {
-  mode: "development",
-  entry: "./src/index.ts",
-  output: {
-    filename: "bundle.js",
-    path: path.resolve(__dirname, "dist"),
-    clean: true,
+const ROOT_DIR = __dirname;
+const SRC_DIR = path.resolve(ROOT_DIR, "src");
+const DIST_DIR = path.resolve(ROOT_DIR, "dist");
+
+const createBaseConfig = (mode) => ({
+  mode,
+  entry: path.resolve(SRC_DIR, "index.ts"),
+  cache: {
+    type: "filesystem",
+    buildDependencies: {
+      config: [__filename],
+    },
   },
+  devtool:
+    mode === "production" ? "source-map" : "eval-cheap-module-source-map",
+  stats: "errors-warnings",
   module: {
     rules: [
       {
         test: /\.ts$/,
-        use: ["ts-loader"],
         exclude: /node_modules/,
+        use: [
+          {
+            loader: "ts-loader",
+            options: {
+              transpileOnly: true,
+            },
+          },
+        ],
       },
     ],
   },
   resolve: {
-    extensions: [".ts", ".js"], // 自动解析扩展名
+    extensions: [".ts", ".js"],
   },
-  devServer: {
-    static: "./dist",
-    hot: true, // 热更新
+  optimization: {
+    minimize: false,
   },
-  devtool: "inline-source-map", // 方便调试
-  plugins: [
-    new HtmlWebpackPlugin({
-      title: "Webpack TS Project",
-      template: "./src/index.html", // 使用自定义模板
-    }),
-  ],
+});
+
+module.exports = (_env, argv = {}) => {
+  const mode = argv.mode === "development" ? "development" : "production";
+  const baseConfig = createBaseConfig(mode);
+
+  return [
+    {
+      ...baseConfig,
+      name: "cjs",
+      output: {
+        filename: "index.cjs",
+        path: DIST_DIR,
+        clean: true,
+        library: {
+          type: "commonjs2",
+        },
+      },
+    },
+    {
+      ...baseConfig,
+      name: "esm",
+      experiments: {
+        outputModule: true,
+      },
+      output: {
+        filename: "index.mjs",
+        path: DIST_DIR,
+        clean: false,
+        module: true,
+        library: {
+          type: "module",
+        },
+      },
+    },
+  ];
 };

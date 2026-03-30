@@ -50,12 +50,54 @@ export const EVENT_TYPE = {
 export type BuiltinEventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];
 export type EventType = BuiltinEventType | (string & {});
 
+export interface TransportSuccessResult {
+  ok: true;
+}
+
+export interface TransportFailureResult {
+  ok: false;
+  error: unknown;
+  retryable?: boolean;
+  statusCode?: number;
+}
+
+export type TransportResult = TransportSuccessResult | TransportFailureResult;
+export type TransportSendSource = "direct" | "queue";
+
+export interface TransportFailureOptions {
+  retryCount?: number;
+  retryDelayMs?: number;
+  maxRetryDelayMs?: number;
+  queueEnabled?: boolean;
+  maxQueueSize?: number;
+  maxQueuedAttempts?: number;
+}
+
+export interface TransportErrorContext {
+  event: MonitorEvent;
+  result: TransportFailureResult;
+  attempt: number;
+  source: TransportSendSource;
+  queued: boolean;
+  queueSize: number;
+  willRetry: boolean;
+  dropped: boolean;
+}
+
+export interface Transport {
+  send(event: MonitorEvent): TransportResult | Promise<TransportResult>;
+  dispose?(): void;
+}
+
 export interface SDKOptions {
   dsn: string;
   appVersion?: string;
   environment?: "development" | "production" | "test";
   integrations?: Integration[];
+  transport?: Transport;
   beforeSend?: (event: MonitorEvent) => MonitorEvent | null;
+  transportFailureOptions?: TransportFailureOptions;
+  onTransportError?: (context: TransportErrorContext) => void;
 }
 
 export interface MonitorEvent {
@@ -95,6 +137,7 @@ export interface TrackerInstance {
   clearUser(): void;
   setTag(key: string, value: string): void;
   getDsn(): string;
+  flush(): Promise<void>;
 }
 
 export interface Integration {
