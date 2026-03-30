@@ -41,6 +41,11 @@ export { FetchIntegration } from "./intergrations/fetch";
 export type { FetchIntegrationOptions } from "./intergrations/fetch";
 export { XhrIntegration } from "./intergrations/xhr";
 export type { XhrIntegrationOptions } from "./intergrations/xhr";
+export { ReactIntegration } from "./intergrations/react";
+export type {
+  ReactErrorInfoLike,
+  ReactIntegrationOptions,
+} from "./intergrations/react";
 export { VueIntegration } from "./intergrations/vue";
 export { MiniProgramIntegration } from "./intergrations/miniprogram";
 export type {

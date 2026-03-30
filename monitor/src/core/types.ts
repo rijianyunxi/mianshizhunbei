@@ -20,6 +20,7 @@ export const EVENT_TYPE = {
   JS_ERROR: "js_error",
   UNHANDLED_REJECTION: "unhandled_rejection",
   VUE_ERROR: "vue_error",
+  REACT_ERROR: "react_error",
 
   // Network/resource events
   HTTP_ERROR: "http_error",

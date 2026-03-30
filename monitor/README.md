@@ -1,4 +1,4 @@
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+Simplified Chinese documentation is available in `README.zh-CN.md` in the source repository.
 
 # oh-my-monitor-sdk
 
@@ -9,6 +9,7 @@ A cross-platform monitoring SDK for browser, Vue, and mini-program applications.
 - JavaScript runtime error collection
 - Promise rejection collection
 - Fetch and XHR error collection
+- React error boundary integration
 - Vue application error collection
 - Mini-program runtime and request error collection
 - Built-in transport retry and in-memory failure queue
@@ -63,6 +64,41 @@ app.mount("#app");
 
 Note: `VueIntegration` hooks into `app.config.errorHandler` to capture Vue runtime errors while preserving the existing app handler.
 
+## React
+
+```tsx
+import React from "react";
+import {
+  MonitorSDK,
+  ReactIntegration,
+} from "oh-my-monitor-sdk";
+
+const reactIntegration = new ReactIntegration();
+
+const monitor = new MonitorSDK({
+  dsn: "https://your-report-endpoint",
+  integrations: [reactIntegration],
+});
+
+class MonitorErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
+    reactIntegration.captureError(error, errorInfo);
+    this.setState({ hasError: true });
+  }
+
+  render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+```
+
+Note: React runtime errors are typically captured through Error Boundaries, so `ReactIntegration` provides `captureError()` and `createErrorHandler()` for that integration point.
+
 ## Mini Program
 
 ```ts
@@ -114,6 +150,7 @@ Core options:
 - `FetchIntegration`: fetch request error collection
 - `XhrIntegration`: XMLHttpRequest error collection
 - `VueIntegration`: Vue runtime error collection
+- `ReactIntegration`: React error boundary collection
 - `MiniProgramIntegration`: mini-program runtime and request error collection
 
 ## Build

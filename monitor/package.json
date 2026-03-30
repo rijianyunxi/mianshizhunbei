@@ -29,6 +29,7 @@
     "error-monitoring",
     "performance",
     "browser",
+    "react",
     "vue",
     "miniprogram"
   ],

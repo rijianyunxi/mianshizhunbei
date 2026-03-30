@@ -1,4 +1,4 @@
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+英文文档请在源码仓库中查看 `README.md`。
 
 # oh-my-monitor-sdk
 
@@ -9,6 +9,7 @@
 - JavaScript 运行时错误采集
 - Promise rejection 采集
 - Fetch 与 XHR 异常采集
+- React Error Boundary 错误采集
 - Vue 应用错误采集
 - 小程序运行时错误与请求异常采集
 - 内置 transport 重试与内存失败队列
@@ -63,6 +64,41 @@ app.mount("#app");
 
 说明：`VueIntegration` 会接入 `app.config.errorHandler`，用于采集 Vue 运行时错误，并保留业务侧原有 handler。
 
+## React
+
+```tsx
+import React from "react";
+import {
+  MonitorSDK,
+  ReactIntegration,
+} from "oh-my-monitor-sdk";
+
+const reactIntegration = new ReactIntegration();
+
+const monitor = new MonitorSDK({
+  dsn: "https://your-report-endpoint",
+  integrations: [reactIntegration],
+});
+
+class MonitorErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
+    reactIntegration.captureError(error, errorInfo);
+    this.setState({ hasError: true });
+  }
+
+  render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+```
+
+说明：React 运行时错误通常需要通过 Error Boundary 采集，所以 `ReactIntegration` 主要提供 `captureError()` 和 `createErrorHandler()` 这两个接入点。
+
 ## 小程序
 
 ```ts
@@ -114,6 +150,7 @@ const monitor = new MonitorSDK({
 - `FetchIntegration`：Fetch 请求异常采集
 - `XhrIntegration`：XMLHttpRequest 异常采集
 - `VueIntegration`：Vue 运行时错误采集
+- `ReactIntegration`：React Error Boundary 错误采集
 - `MiniProgramIntegration`：小程序错误与请求异常采集
 
 ## 构建
