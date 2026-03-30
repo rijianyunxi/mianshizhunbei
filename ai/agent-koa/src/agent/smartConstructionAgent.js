@@ -182,7 +182,7 @@ function shouldRecoverFromMessageRoleError(error, input) {
   return Boolean(input?.persistThread && threadId && isInvalidMessageRoleError(error));
 }
 
-export class SmartConstructionAgentService {
+class SmartConstructionAgentService {
   createThreadId() {
     return uuidv4();
   }
@@ -214,7 +214,6 @@ export class SmartConstructionAgentService {
 
     const query = extractLatestUserQuery(input.messages);
     const selectedTools = await toolRouter.selectTools(query, env.TOOL_ROUTER_TOP_K);
-    console.log('====',selectedTools);
     
     const tools = selectedTools.map((descriptor) => {
       const schema = jsonSchemaToZod(descriptor.inputSchema);
@@ -281,7 +280,7 @@ export class SmartConstructionAgentService {
       console.warn(
         `[agent] message role corrupted, reset checkpoint and retry once. thread_id=${runtime.input.threadId}; error=${errorToMessage(error)}`,
       );
-      clearThreadCheckpoints(runtime.input.threadId);
+      await clearThreadCheckpoints(runtime.input.threadId);
       const retryRuntime = await this.buildRuntime(runtime.input);
       result = await retryRuntime.agent.invoke({ messages: retryRuntime.messages }, retryRuntime.config);
 
@@ -402,7 +401,7 @@ export class SmartConstructionAgentService {
       console.warn(
         `[agent] message role corrupted, reset checkpoint and retry once(stream). thread_id=${runtime.input.threadId}; error=${errorToMessage(error)}`,
       );
-      clearThreadCheckpoints(runtime.input.threadId);
+      await clearThreadCheckpoints(runtime.input.threadId);
       const retryRuntime = await this.buildRuntime(runtime.input);
       return streamOnce(retryRuntime);
     }

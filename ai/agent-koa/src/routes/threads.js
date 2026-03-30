@@ -17,7 +17,7 @@ const createThreadSchema = z.object({
 
 export const threadsRouter = new Router();
 
-threadsRouter.get('/agent/threads', (ctx) => {
+threadsRouter.get('/agent/threads', async (ctx) => {
   const parsed = listThreadsSchema.safeParse(ctx.query);
   if (!parsed.success) {
     ctx.status = 400;
@@ -28,11 +28,11 @@ threadsRouter.get('/agent/threads', (ctx) => {
     return;
   }
 
-  const items = conversationStore.listConversations(parsed.data.limit);
+  const items = await conversationStore.listConversations(parsed.data.limit);
   ctx.body = { items };
 });
 
-threadsRouter.post('/agent/threads', (ctx) => {
+threadsRouter.post('/agent/threads', async (ctx) => {
   const parsed = createThreadSchema.safeParse(ctx.request.body || {});
   if (!parsed.success) {
     ctx.status = 400;
@@ -44,7 +44,7 @@ threadsRouter.post('/agent/threads', (ctx) => {
   }
 
   const threadId = smartConstructionAgent.createThreadId();
-  const item = conversationStore.createConversation(threadId, parsed.data.title);
+  const item = await conversationStore.createConversation(threadId, parsed.data.title);
 
   ctx.status = 201;
   ctx.body = {
@@ -53,7 +53,7 @@ threadsRouter.post('/agent/threads', (ctx) => {
   };
 });
 
-threadsRouter.get('/agent/threads/:threadId/messages', (ctx) => {
+threadsRouter.get('/agent/threads/:threadId/messages', async (ctx) => {
   const parsed = listMessagesSchema.safeParse(ctx.query);
   if (!parsed.success) {
     ctx.status = 400;
@@ -71,11 +71,11 @@ threadsRouter.get('/agent/threads/:threadId/messages', (ctx) => {
     return;
   }
 
-  const items = conversationStore.listMessages(threadId, parsed.data.limit);
+  const items = await conversationStore.listMessages(threadId, parsed.data.limit);
   ctx.body = { thread_id: threadId, items };
 });
 
-threadsRouter.delete('/agent/threads/:threadId', (ctx) => {
+threadsRouter.delete('/agent/threads/:threadId', async (ctx) => {
   const threadId = String(ctx.params.threadId || '').trim();
   if (!threadId) {
     ctx.status = 400;
@@ -83,6 +83,6 @@ threadsRouter.delete('/agent/threads/:threadId', (ctx) => {
     return;
   }
 
-  conversationStore.deleteConversation(threadId);
+  await conversationStore.deleteConversation(threadId);
   ctx.status = 204;
 });

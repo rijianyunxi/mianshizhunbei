@@ -82,7 +82,7 @@ agentRouter.post('/agent/chat', async (ctx) => {
 
   if (!payload.stream) {
     if (latestUserMessage) {
-      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+      await conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
     }
 
     const result = await smartConstructionAgent.run({
@@ -91,7 +91,7 @@ agentRouter.post('/agent/chat', async (ctx) => {
       persistThread: true,
     });
 
-    conversationStore.appendMessage(threadId, 'assistant', result.text);
+    await conversationStore.appendMessage(threadId, 'assistant', result.text);
 
     ctx.body = {
       thread_id: threadId,
@@ -110,7 +110,7 @@ agentRouter.post('/agent/chat', async (ctx) => {
 
   try {
     if (latestUserMessage) {
-      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+      await conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
     }
 
     const result = await smartConstructionAgent.stream({
@@ -143,7 +143,7 @@ agentRouter.post('/agent/chat', async (ctx) => {
       },
     });
 
-    conversationStore.appendMessage(threadId, 'assistant', result.text);
+    await conversationStore.appendMessage(threadId, 'assistant', result.text);
 
     sendSSEData(ctx, {
       type: 'done',

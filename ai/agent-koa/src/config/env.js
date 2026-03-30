@@ -52,7 +52,11 @@ const envSchema = z.object({
   TOOL_ROUTER_EMBED_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
   OLLAMA_BASE_URL: z.string().url().optional().default('http://127.0.0.1:11434'),
   OLLAMA_EMBED_MODEL: z.string().min(1).default('nomic-embed-text'),
-  SQLITE_PATH: z.string().min(1).default('./data/agent-checkpoints.sqlite'),
+  PG_CONNECTION_STRING: z.string().min(1).default('postgresql://postgres:postgres@127.0.0.1:5432/agent_koa'),
+  PG_SCHEMA: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).default('public'),
+  PG_POOL_MAX: z.coerce.number().int().positive().default(20),
+  PG_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  PG_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   MCP_SERVERS_JSON: mcpServersJsonSchema,
 });
 

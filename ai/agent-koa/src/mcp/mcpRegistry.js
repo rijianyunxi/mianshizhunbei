@@ -62,7 +62,7 @@ function runtimeToolName(serverId, toolName) {
   return normalized.slice(0, 64);
 }
 
-export class MCPRegistry {
+class MCPRegistry {
   constructor(initialConfigs = []) {
     this.configs = new Map();
     this.active = new Map();

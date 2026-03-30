@@ -26,11 +26,6 @@ export function sendSSEData(target, data, event) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-export function sendSSERaw(target, rawLine) {
-  const res = getResponse(target);
-  res.write(`data: ${rawLine}\n\n`);
-}
-
 export function endSSE(target) {
   const res = getResponse(target);
   res.end();

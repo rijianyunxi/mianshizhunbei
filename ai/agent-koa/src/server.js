@@ -4,11 +4,11 @@ import bodyParser from 'koa-bodyparser';
 import morgan from 'koa-morgan';
 import { env } from './config/env.js';
 import { mcpRegistry } from './mcp/mcpRegistry.js';
-import { checkpointSaver, sqlitePath } from './persistence/checkpointer.js';
+import { initCheckpointer } from './persistence/checkpointer.js';
+import { initConversationStore } from './persistence/conversations.js';
+import { closePgPool, pgInfo } from './persistence/pg.js';
 import { createApiRouter } from './routes/index.js';
 import { toolRouter } from './tooling/toolRouter.js';
-
-// import './test/embedding.js';
 
 const LOG_FORMAT = env.NODE_ENV === 'production' ? 'combined' : 'dev';
 const PUBLIC_PATHS = new Set(['/health']);
@@ -66,7 +66,7 @@ function registerRoutes(app) {
     env,
     mcpRegistry,
     toolRouter,
-    sqlitePath,
+    pgInfo,
   });
 
   app.use(apiRouter.routes());
@@ -84,8 +84,8 @@ const app = createApp();
 let server = null;
 
 async function bootstrap() {
-  // Touch checkpointer once so sqlite schema initializes early.
-  await checkpointSaver.getTuple({ configurable: { thread_id: '__boot__', checkpoint_ns: '__boot__' } }).catch(() => undefined);
+  await initConversationStore();
+  await initCheckpointer();
 
   const bootErrors = await mcpRegistry.bootstrapEnabled();
   const routerState = await toolRouter.rebuildIndex();
@@ -103,6 +103,12 @@ async function shutdown(signal) {
     await mcpRegistry.shutdown();
   } catch (error) {
     console.error('[agent-server] failed to close MCP connections:', error);
+  }
+
+  try {
+    await closePgPool();
+  } catch (error) {
+    console.error('[agent-server] failed to close PG pool:', error);
   }
 
   if (server) {

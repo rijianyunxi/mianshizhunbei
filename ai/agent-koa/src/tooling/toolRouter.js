@@ -47,7 +47,7 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export class ToolRouter {
+class ToolRouter {
   /**
    * 初始化智能调度路由器
    */
@@ -183,9 +183,6 @@ export class ToolRouter {
         }));
         
         scoredDocs.sort((a, b) => b.score - a.score);
-        console.log(`[得分透视] "${queryText}" 的匹配分数:`, scoredDocs.map(d => `${d.descriptor.name}: ${d.score.toFixed(4)}`));
-        // [🚀 调试辅助] 如果你需要排查为什么匹配到了奇怪的工具，可以取消下面这行的注释查看所有工具的分数：
-        // console.log("向量检索打分结果:", scoredDocs.map(d => ({ name: d.descriptor.name, score: d.score.toFixed(4) })));
 
         for (const item of scoredDocs) {
           if (item.score < vectorMinScore) continue;

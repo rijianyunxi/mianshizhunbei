@@ -68,7 +68,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
 
   if (!payload.stream) {
     if (threadId && latestUserMessage) {
-      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+      await conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
     }
 
     const result = await smartConstructionAgent.run({
@@ -78,7 +78,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
     });
 
     if (threadId) {
-      conversationStore.appendMessage(threadId, 'assistant', result.text);
+      await conversationStore.appendMessage(threadId, 'assistant', result.text);
     }
 
     ctx.body = {
@@ -115,7 +115,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
 
   try {
     if (threadId && latestUserMessage) {
-      conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
+      await conversationStore.appendMessage(threadId, 'user', latestUserMessage.content);
     }
 
     const result = await smartConstructionAgent.stream({
@@ -136,7 +136,7 @@ openAICompatibleRouter.post('/v1/chat/completions', async (ctx) => {
     });
 
     if (threadId) {
-      conversationStore.appendMessage(threadId, 'assistant', result.text);
+      await conversationStore.appendMessage(threadId, 'assistant', result.text);
     }
 
     ctx.res.write(

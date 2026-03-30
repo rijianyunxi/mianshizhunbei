@@ -8,12 +8,12 @@ import { threadsRouter } from './threads.js';
 const BUILD_ID = '2026-03-09-nav-direct-v1';
 const subRouters = [agentRouter, threadsRouter, openAICompatibleRouter, mcpAdminRouter, rpcRouter];
 
-function buildHealthPayload({ env, mcpRegistry, toolRouter, sqlitePath }) {
+function buildHealthPayload({ env, mcpRegistry, toolRouter, pgInfo }) {
   return {
     ok: true,
     build: BUILD_ID,
     model: env.OPENAI_MODEL,
-    sqlite_path: sqlitePath,
+    pg: pgInfo,
     active_mcp_servers: mcpRegistry.list().filter((item) => item.active).length,
     tool_router: toolRouter.getStatus(),
     time: new Date().toISOString(),
