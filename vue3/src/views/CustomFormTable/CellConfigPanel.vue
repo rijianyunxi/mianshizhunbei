@@ -1,18 +1,22 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { CellSchema, CellType, TextAlign } from './types'
 
-defineProps<{
+const props = defineProps<{
   cell: CellSchema | null
   rowIndex: number
   colIndex: number
   rowType: 'normal' | 'loop'
   loopKey: string
+  rowHeight: number
+  colWidth: number
 }>()
 
 const emit = defineEmits<{
   update: [updates: Partial<CellSchema>]
   updateRowType: [type: 'normal' | 'loop']
   updateLoopKey: [key: string]
+  updateRowHeight: [height: number]
+  updateColWidth: [width: number]
 }>()
 
 function updateCell(updates: Partial<CellSchema>) {
@@ -42,17 +46,31 @@ function handleRowTypeChange(type: 'normal' | 'loop') {
 function handleLoopKeyChange(key: string) {
   emit('updateLoopKey', key)
 }
+
+function toPositiveNumber(value: string, fallback: number): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.round(parsed)
+}
+
+function handleRowHeightChange(value: string) {
+  emit('updateRowHeight', Math.max(24, toPositiveNumber(value, props.rowHeight)))
+}
+
+function handleColWidthChange(value: string) {
+  emit('updateColWidth', Math.max(60, toPositiveNumber(value, props.colWidth)))
+}
 </script>
 
 <template>
   <div class="cell-config-panel">
     <div class="panel-header">
       <h3>单元格配置</h3>
-      <span class="cell-position">行 {{ rowIndex + 1 }}, 列 {{ colIndex + 1 }}</span>
+      <span class="cell-position">行 {{ rowIndex + 1 }}，列 {{ colIndex + 1 }}</span>
     </div>
 
     <div v-if="!cell" class="empty-state">
-      请选择一个单元格进行配置
+      请选择一个单元格进行配置。
     </div>
 
     <template v-else>
@@ -65,12 +83,24 @@ function handleLoopKeyChange(key: string) {
             <option value="loop">循环行</option>
           </select>
         </div>
+
+        <div class="form-item">
+          <label>行高</label>
+          <input
+            type="number"
+            min="24"
+            step="4"
+            :value="rowHeight"
+            @input="handleRowHeightChange(($event.target as HTMLInputElement).value)"
+          />
+        </div>
+
         <div v-if="rowType === 'loop'" class="form-item">
           <label>循环数据键</label>
           <input
             type="text"
             :value="loopKey"
-            placeholder="如: purchase_list"
+            placeholder="例如 purchase_list"
             @input="handleLoopKeyChange(($event.target as HTMLInputElement).value)"
           />
         </div>
@@ -79,22 +109,13 @@ function handleLoopKeyChange(key: string) {
       <div class="config-section">
         <h4>单元格类型</h4>
         <div class="type-selector">
-          <button
-            :class="{ active: cell.type === 'static' }"
-            @click="handleTypeChange('static')"
-          >
+          <button :class="{ active: cell.type === 'static' }" @click="handleTypeChange('static')">
             静态文本
           </button>
-          <button
-            :class="{ active: cell.type === 'master' }"
-            @click="handleTypeChange('master')"
-          >
+          <button :class="{ active: cell.type === 'master' }" @click="handleTypeChange('master')">
             主表绑定
           </button>
-          <button
-            :class="{ active: cell.type === 'detail' }"
-            @click="handleTypeChange('detail')"
-          >
+          <button :class="{ active: cell.type === 'detail' }" @click="handleTypeChange('detail')">
             明细绑定
           </button>
         </div>
@@ -115,16 +136,17 @@ function handleLoopKeyChange(key: string) {
 
         <template v-else>
           <div class="form-item">
-            <label>字段键 (Field Key)</label>
+            <label>字段键</label>
             <input
               type="text"
               :value="cell.fieldKey"
-              placeholder="如: order_name"
+              placeholder="例如 order_name"
               @input="handleFieldKeyChange(($event.target as HTMLInputElement).value)"
             />
           </div>
+
           <div class="form-item">
-            <label>显示文本 (可选)</label>
+            <label>显示文本（可选）</label>
             <input
               type="text"
               :value="cell.text"
@@ -136,7 +158,21 @@ function handleLoopKeyChange(key: string) {
       </div>
 
       <div class="config-section">
-        <h4>样式设置</h4>
+        <h4>尺寸与样式</h4>
+        <div class="form-item">
+          <label>当前列宽</label>
+          <input
+            type="number"
+            min="60"
+            step="10"
+            :value="colWidth"
+            @input="handleColWidthChange(($event.target as HTMLInputElement).value)"
+          />
+          <div v-if="cell.colspan > 1" class="size-note">
+            当前单元格跨 {{ cell.colspan }} 列，这里调整的是起始列宽度。
+          </div>
+        </div>
+
         <div class="form-item">
           <label>对齐方式</label>
           <div class="align-selector">
@@ -145,11 +181,10 @@ function handleLoopKeyChange(key: string) {
             <button :class="{ active: cell.textAlign === 'right' }" @click="handleAlignChange('right')">右对齐</button>
           </div>
         </div>
+
         <div class="form-item">
           <label>合并状态</label>
-          <span class="merge-info">
-            跨 {{ cell.rowspan }} 行 × {{ cell.colspan }} 列
-          </span>
+          <span class="merge-info">跨 {{ cell.rowspan }} 行 × {{ cell.colspan }} 列</span>
         </div>
       </div>
     </template>
@@ -232,7 +267,15 @@ function handleLoopKeyChange(key: string) {
   }
 }
 
-.type-selector {
+.size-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.type-selector,
+.align-selector {
   display: flex;
   gap: 4px;
 
@@ -260,36 +303,10 @@ function handleLoopKeyChange(key: string) {
   }
 }
 
-.align-selector {
-  display: flex;
-  gap: 4px;
-
-  button {
-    flex: 1;
-    padding: 6px 4px;
-    font-size: 11px;
-    border: 1px solid #dcdfe6;
-    background: #fff;
-    border-radius: 4px;
-    cursor: pointer;
-    color: #606266;
-    transition: all 0.2s;
-
-    &:hover {
-      border-color: #409eff;
-      color: #409eff;
-    }
-
-    &.active {
-      background: #409eff;
-      border-color: #409eff;
-      color: #fff;
-    }
-  }
-}
-
 .merge-info {
   font-size: 13px;
   color: #606266;
 }
 </style>
+
+

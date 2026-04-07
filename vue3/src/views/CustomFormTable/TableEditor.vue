@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { DEFAULT_COL_WIDTH, DEFAULT_ROW_HEIGHT } from './types'
 import type { CellSchema, CellSelection } from './types'
 import { useTableDSL } from './composables/useTableDSL'
 
@@ -25,6 +26,7 @@ const {
   mergeCells,
   splitCell,
   getCellAt,
+  getCellStartCol,
   importDSL,
   reset,
   undo,
@@ -43,11 +45,21 @@ const canMerge = computed(() => {
   return canMergeCells(selection.value)
 })
 
+const tableMinWidth = computed(() => {
+  const widths = dsl.value.colWidths ?? []
+  const totalWidth = widths.length > 0
+    ? widths.reduce((sum, width) => sum + width, 0)
+    : dsl.value.colCount * DEFAULT_COL_WIDTH
+
+  return `${totalWidth}px`
+})
+
 function handleCellMouseDown(rowIndex: number, colIndex: number, e: MouseEvent) {
   if (e.button === 2) {
     contextCellPos.value = { rowIndex, colIndex }
     return
   }
+
   e.preventDefault()
   mouseDownPos.value = { row: rowIndex, col: colIndex }
   selectedCell.value = { rowIndex, colIndex }
@@ -57,6 +69,7 @@ function handleCellMouseDown(rowIndex: number, colIndex: number, e: MouseEvent) 
 
 function handleCellMouseEnter(rowIndex: number, colIndex: number) {
   if (!isSelecting.value || !mouseDownPos.value) return
+
   const startRow = Math.min(mouseDownPos.value.row, rowIndex)
   const startCol = Math.min(mouseDownPos.value.col, colIndex)
   const endRow = Math.max(mouseDownPos.value.row, rowIndex)
@@ -159,17 +172,25 @@ function isCellSelected(rowIndex: number, colIndex: number): boolean {
   return selectedCell.value?.rowIndex === rowIndex && selectedCell.value?.colIndex === colIndex
 }
 
-function getActualColIndex(row: typeof dsl.value.rows[number], cellIdx: number): number {
-  let col = 0
-  for (let i = 0; i < cellIdx; i++) {
-    col += row.cells[i].colspan
-  }
-  return col
-}
-
 function canSplitCell(rowIndex: number, colIndex: number): boolean {
   const cell = getCellAt(rowIndex, colIndex)
   return cell !== null && (cell.rowspan > 1 || cell.colspan > 1)
+}
+
+function getColWidth(colIndex: number): number {
+  return dsl.value.colWidths?.[colIndex] ?? DEFAULT_COL_WIDTH
+}
+
+function getRowHeight(rowIndex: number): number {
+  return dsl.value.rows[rowIndex]?.height ?? DEFAULT_ROW_HEIGHT
+}
+
+function getCellHeight(rowIndex: number, rowspan: number): number {
+  let totalHeight = 0
+  for (let offset = 0; offset < rowspan; offset++) {
+    totalHeight += getRowHeight(rowIndex + offset)
+  }
+  return totalHeight
 }
 
 defineExpose({
@@ -191,39 +212,46 @@ defineExpose({
     @mouseup="handleMouseUp"
     @mouseleave="handleMouseUp"
   >
-    <table class="editor-table">
-      <template v-for="(row, rowIndex) in dsl.rows" :key="row.id">
-        <tr
-          v-for="(_, idx) in (row.type === 'loop' ? [0] : [0])"
-          :key="`${row.id}_${idx}`"
-          :class="{ 'loop-row': row.type === 'loop' }"
+    <table class="editor-table" :style="{ minWidth: tableMinWidth }">
+      <colgroup>
+        <col
+          v-for="(_, colIndex) in dsl.colCount"
+          :key="colIndex"
+          :style="{ width: `${getColWidth(colIndex)}px` }"
         >
+      </colgroup>
+
+      <template v-for="(row, rowIndex) in dsl.rows" :key="row.id">
+        <tr :class="{ 'loop-row': row.type === 'loop' }">
           <template v-for="(cell, cellIdx) in row.cells" :key="cell.id">
             <td
               :rowspan="cell.rowspan"
               :colspan="cell.colspan"
-              :style="{ textAlign: cell.textAlign, height: cell.rowspan > 1 ? `${cell.rowspan * 48}px` : undefined }"
+              :style="{ textAlign: cell.textAlign }"
               :class="{
-                'selected-cell': isCellSelected(rowIndex, getActualColIndex(row, cellIdx)),
-                'in-selection': isCellInSelection(rowIndex, getActualColIndex(row, cellIdx)),
+                'selected-cell': isCellSelected(rowIndex, getCellStartCol(rowIndex, cellIdx)),
+                'in-selection': isCellInSelection(rowIndex, getCellStartCol(rowIndex, cellIdx)),
               }"
-              @mousedown="handleCellMouseDown(rowIndex, getActualColIndex(row, cellIdx), $event)"
-              @mouseenter="handleCellMouseEnter(rowIndex, getActualColIndex(row, cellIdx))"
-              @click="handleCellClick(rowIndex, getActualColIndex(row, cellIdx))"
-              @contextmenu="handleCellContextmenu(rowIndex, getActualColIndex(row, cellIdx), $event)"
+              @mousedown="handleCellMouseDown(rowIndex, getCellStartCol(rowIndex, cellIdx), $event)"
+              @mouseenter="handleCellMouseEnter(rowIndex, getCellStartCol(rowIndex, cellIdx))"
+              @click="handleCellClick(rowIndex, getCellStartCol(rowIndex, cellIdx))"
+              @contextmenu="handleCellContextmenu(rowIndex, getCellStartCol(rowIndex, cellIdx), $event)"
             >
-              <span v-if="cell.type === 'static'" class="cell-content static-cell">{{ cell.text || '静态文本' }}</span>
-              <span v-else-if="cell.type === 'master'" class="cell-content bind-cell">
-                <span class="bind-icon">📎</span>
-                {{ cell.fieldKey || '未绑定' }}
-              </span>
-              <span v-else-if="cell.type === 'detail'" class="cell-content detail-cell">
-                <span class="bind-icon">📋</span>
-                {{ cell.fieldKey || '未绑定' }}
-              </span>
-              <span v-if="row.type === 'loop'" class="loop-badge">循环</span>
+              <div class="cell-inner" :style="{ minHeight: `${getCellHeight(rowIndex, cell.rowspan)}px` }">
+                <span v-if="cell.type === 'static'" class="cell-content static-cell">{{ cell.text || '静态文本' }}</span>
+                <span v-else-if="cell.type === 'master'" class="cell-content bind-cell">
+                  <span class="bind-icon">M</span>
+                  {{ cell.fieldKey || '未绑定字段' }}
+                </span>
+                <span v-else-if="cell.type === 'detail'" class="cell-content detail-cell">
+                  <span class="bind-icon">D</span>
+                  {{ cell.fieldKey || '未绑定字段' }}
+                </span>
+                <span v-if="row.type === 'loop'" class="loop-badge">循环</span>
+              </div>
             </td>
           </template>
+
           <td v-if="row.cells.length === 0" :colspan="dsl.colCount" class="row-placeholder" />
         </tr>
       </template>
@@ -240,13 +268,17 @@ defineExpose({
         <div class="context-menu-item" @click="handleAddRowBelow">下方插入行</div>
         <div class="context-menu-item" @click="handleDeleteRow" :class="{ disabled: dsl.rows.length <= 1 }">删除行</div>
       </div>
+
       <div class="context-menu-divider" />
+
       <div class="context-menu-group">
         <div class="context-menu-item" @click="handleAddColLeft">左侧插入列</div>
         <div class="context-menu-item" @click="handleAddColRight">右侧插入列</div>
         <div class="context-menu-item" @click="handleDeleteCol" :class="{ disabled: dsl.colCount <= 1 }">删除列</div>
       </div>
+
       <div class="context-menu-divider" />
+
       <div class="context-menu-group">
         <div class="context-menu-item" @click="handleMerge" :class="{ disabled: !canMerge }">合并单元格</div>
         <div
@@ -270,14 +302,14 @@ defineExpose({
 }
 
 .editor-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   user-select: none;
 
   td {
     border: 1px solid #dcdfe6;
-    padding: 12px 16px;
-    min-height: 48px;
+    padding: 0;
     cursor: cell;
     position: relative;
     transition: background-color 0.1s;
@@ -305,6 +337,15 @@ defineExpose({
   }
 }
 
+.cell-inner {
+  min-height: 40px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
 .cell-content {
   display: inline-flex;
   align-items: center;
@@ -327,6 +368,7 @@ defineExpose({
 
 .bind-icon {
   font-size: 12px;
+  font-weight: 700;
 }
 
 .loop-badge {
@@ -386,10 +428,7 @@ defineExpose({
 
 .context-menu-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 1999;
 }
 </style>

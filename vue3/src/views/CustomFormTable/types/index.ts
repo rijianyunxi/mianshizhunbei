@@ -4,6 +4,9 @@ export type RowType = 'normal' | 'loop'
 
 export type TextAlign = 'left' | 'center' | 'right'
 
+export const DEFAULT_ROW_HEIGHT = 40
+export const DEFAULT_COL_WIDTH = 160
+
 export interface CellSchema {
   id: string
   type: CellType
@@ -19,6 +22,7 @@ export interface RowSchema {
   id: string
   type: RowType
   loopKey?: string
+  height?: number
   cells: CellSchema[]
 }
 
@@ -27,6 +31,7 @@ export interface TableDSL {
   name: string
   rows: RowSchema[]
   colCount: number
+  colWidths?: number[]
 }
 
 export interface FormData {

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import TableEditor from './TableEditor.vue'
 import CellConfigPanel from './CellConfigPanel.vue'
 import CustomFormTable from './CustomFormTable.vue'
+import { DEFAULT_COL_WIDTH, DEFAULT_ROW_HEIGHT } from './types'
 import type { CellSchema, CellSelection, FormData } from './types'
 
 const activeTab = ref<'editor' | 'preview' | 'dsl'>('editor')
@@ -12,6 +13,8 @@ const selectedRowIndex = ref(0)
 const selectedColIndex = ref(0)
 const selectedRowType = ref<'normal' | 'loop'>('normal')
 const selectedLoopKey = ref('')
+const selectedRowHeight = ref(DEFAULT_ROW_HEIGHT)
+const selectedColWidth = ref(DEFAULT_COL_WIDTH)
 const currentSelection = ref<CellSelection | null>(null)
 
 const tableEditorRef = ref<InstanceType<typeof TableEditor> | null>(null)
@@ -37,6 +40,8 @@ function handleCellSelect(rowIndex: number, colIndex: number, cell: CellSchema) 
   if (dsl.value?.rows[rowIndex]) {
     selectedRowType.value = dsl.value.rows[rowIndex].type
     selectedLoopKey.value = dsl.value.rows[rowIndex].loopKey || ''
+    selectedRowHeight.value = dsl.value.rows[rowIndex].height ?? DEFAULT_ROW_HEIGHT
+    selectedColWidth.value = dsl.value.colWidths?.[colIndex] ?? DEFAULT_COL_WIDTH
   }
 }
 
@@ -65,6 +70,22 @@ function handleLoopKeyChange(key: string) {
     row.loopKey = key
     selectedLoopKey.value = key
   }
+}
+
+function handleRowHeightChange(height: number) {
+  if (!dsl.value) return
+  const row = dsl.value.rows[selectedRowIndex.value]
+  if (row) {
+    row.height = height
+    selectedRowHeight.value = height
+  }
+}
+
+function handleColWidthChange(width: number) {
+  if (!dsl.value) return
+  dsl.value.colWidths ??= Array.from({ length: dsl.value.colCount }, () => DEFAULT_COL_WIDTH)
+  dsl.value.colWidths[selectedColIndex.value] = width
+  selectedColWidth.value = width
 }
 
 function handleExportDSL() {
@@ -110,6 +131,8 @@ function handleRedo() {
 function handleReset() {
   tableEditorRef.value?.reset()
   selectedCell.value = null
+  selectedRowHeight.value = DEFAULT_ROW_HEIGHT
+  selectedColWidth.value = DEFAULT_COL_WIDTH
 }
 
 function handleLoadDemo() {
@@ -222,7 +245,7 @@ function handleLoadDemo() {
       </div>
 
       <div v-if="showConfigPanel && activeTab === 'editor'" class="config-panel-wrapper">
-        <CellConfigPanel
+        <CellConfigPanel :row-height="selectedRowHeight" :col-width="selectedColWidth"
           :cell="selectedCell"
           :row-index="selectedRowIndex"
           :col-index="selectedColIndex"
@@ -231,6 +254,8 @@ function handleLoadDemo() {
           @update="handleCellUpdate"
           @update-row-type="handleRowTypeChange"
           @update-loop-key="handleLoopKeyChange"
+          @update-row-height="handleRowHeightChange"
+          @update-col-width="handleColWidthChange"
         />
       </div>
     </div>
