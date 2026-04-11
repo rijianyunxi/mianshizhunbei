@@ -72,6 +72,18 @@ export default defineConfig({
           ]
         },
         {
+          text: 'TypeScript 工程配置',
+          collapsed: true,
+          items: [
+            { text: '系列首页', link: '/posts/typescript-config/' },
+            { text: '01 - tsconfig.json 全配置详解', link: '/posts/typescript-config/01-tsconfig全配置详解' },
+            { text: '02 - tsx / tsup / tsc 工具链对比', link: '/posts/typescript-config/02-tsx-tsup-tsc工具链对比' },
+            { text: '03 - 环境变量与 dotenv', link: '/posts/typescript-config/03-环境变量与dotenv' },
+            { text: '04 - 模块系统与路径别名', link: '/posts/typescript-config/04-模块系统与路径别名' },
+            { text: '05 - OpenAI SDK 类型系统详解', link: '/posts/typescript-config/05-OpenAI-SDK类型系统详解' },
+          ]
+        },
+        {
           text: 'Vue3 迷你实现',
           collapsed: true,
           items: [
@@ -87,7 +99,7 @@ export default defineConfig({
           ]
         },
         {
-          text: 'React 迷你实现',
+          text: 'React',
           collapsed: true,
           items: [
             { text: '系列首页', link: '/posts/react-mini/' },
@@ -104,17 +116,14 @@ export default defineConfig({
           items: [
             { text: '前端监控 SDK', link: '/posts/monitor-sdk/' },
             { text: '浏览器 API', link: '/posts/浏览器API/' },
-            { text: 'React 实战', link: '/posts/React实战/' },
-            { text: 'Vue 实战', link: '/posts/Vue实战/' },
             { text: 'Webpack', link: '/posts/webpack/' },
-            { text: '项目亮点与面试', link: '/posts/项目亮点与面试/' },
           ]
         },
       ]
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/' },
+      { icon: 'github', link: 'https://github.com/rijianyunxi' },
     ],
 
     search: {
