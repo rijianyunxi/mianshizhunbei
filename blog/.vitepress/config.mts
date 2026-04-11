@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   lang: 'zh-CN',
   title: "song's blog",
-  description: '前端、算法与 AI Agent 学习记录',
+  description: '记录生活，记录学习！',
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
