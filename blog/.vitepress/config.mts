@@ -25,7 +25,6 @@ export default defineConfig({
           text: 'LeetCode Hot100',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/leetcode-hot100/' },
             { text: '01 - 数组与哈希', link: '/posts/leetcode-hot100/01-数组与哈希' },
             { text: '02 - 双指针', link: '/posts/leetcode-hot100/02-双指针' },
             { text: '03 - 滑动窗口', link: '/posts/leetcode-hot100/03-滑动窗口' },
@@ -44,7 +43,6 @@ export default defineConfig({
           text: 'JS 手写实现',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/js-手写实现/' },
             { text: '01 - Promise 完整实现', link: '/posts/js-手写实现/01-Promise完整实现' },
             { text: '02 - 深拷贝完整实现', link: '/posts/js-手写实现/02-深拷贝完整实现' },
             { text: '03 - 继承的六种方式', link: '/posts/js-手写实现/03-继承的六种方式' },
@@ -64,7 +62,6 @@ export default defineConfig({
           text: 'AI Agent',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/ai-agent/' },
             { text: '01 - Koa 后端服务架构', link: '/posts/ai-agent/01-Koa后端服务架构' },
             { text: '02 - React 前端聊天界面实现', link: '/posts/ai-agent/02-React前端-聊天界面实现' },
             { text: '03 - LangGraph + MCP 工具调度设计', link: '/posts/ai-agent/03-LangGraph与MCP工具调度设计' },
@@ -75,7 +72,6 @@ export default defineConfig({
           text: 'TypeScript 工程配置',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/typescript-config/' },
             { text: '01 - tsconfig.json 全配置详解', link: '/posts/typescript-config/01-tsconfig全配置详解' },
             { text: '02 - tsx / tsup / tsc 工具链对比', link: '/posts/typescript-config/02-tsx-tsup-tsc工具链对比' },
             { text: '03 - 环境变量与 dotenv', link: '/posts/typescript-config/03-环境变量与dotenv' },
@@ -87,7 +83,6 @@ export default defineConfig({
           text: 'Vue3 迷你实现',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/vue-mini/' },
             { text: '01 - 项目架构总览', link: '/posts/vue-mini/01-vue3-mini-项目架构总览' },
             { text: '02 - 响应式系统 reactive & proxy', link: '/posts/vue-mini/02-vue3-响应式系统-reactive-proxy' },
             { text: '03 - 依赖收集与触发 effect', link: '/posts/vue-mini/03-vue3-依赖收集与触发-effect' },
@@ -102,7 +97,6 @@ export default defineConfig({
           text: 'React',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/react-mini/' },
             { text: '01 - 项目架构总览', link: '/posts/react-mini/01-react-mini-项目架构总览' },
             { text: '02 - JSX 与 ReactElement', link: '/posts/react-mini/02-React-JSX与ReactElement' },
             { text: '03 - Fiber 架构详解', link: '/posts/react-mini/03-React-Fiber架构详解' },
