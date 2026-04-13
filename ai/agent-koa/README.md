@@ -55,8 +55,6 @@ SmartConstructionAgent
 │  │  └─ KeywordSearch.js
 │  ├─ mcp/
 │  │  ├─ mcpRegistry.js
-│  │  ├─ demoSmartSiteServer.js
-│  │  └─ hotSwapTestServer.js
 │  ├─ persistence/
 │  │  ├─ pg.js                     # 共享 PG 连接池
 │  │  ├─ checkpointer.js           # LangGraph checkpoint 存储
@@ -65,7 +63,6 @@ SmartConstructionAgent
 │     ├─ schema.js
 │     └─ sse.js
 └─ scripts/
-   └─ chatCli.js                   # 命令行调试
 ```
 
 
@@ -102,25 +99,18 @@ npm run dev
 
 榛樿鐩戝惉锛歚http://localhost:8787`
 
-### 5.5 鍚姩绀轰緥 MCP 宸ュ叿鏈嶅姟
 
 ```bash
-npm run mcp:demo
 ```
 
 鐑彃鎷旀祴璇曞伐鍏凤細
 
 ```bash
-npm run mcp:test
 ```
 
 涔熷彲浠ラ€氳繃 `.env` 鐨?`MCP_SERVERS_JSON` 璁╀富鏈嶅姟鑷姩鎷夎捣鎻掍欢锛堣 `.env.example`锛夈€?
-### 5.6 CLI 璋冭瘯
 
 ```bash
-npm run chat -- "浠婂ぉ濉斿悐鍚婅鍓嶈妫€鏌ヤ粈涔?
-npm run chat -- --stream "璇勪及澶滈棿楂樺浣滀笟椋庨櫓"
-npm run chat -- --stream --thread my-thread-1 "缁х画涓婃鏂规"
 ```
 
 ## 6. 鐜鍙橀噺璇存槑
@@ -271,7 +261,6 @@ Content-Type: application/json
    - 鎻愰珮 `TOOL_ROUTER_TOP_K`锛岄€傚綋闄嶄綆鍚戦噺闃堝€笺€?3. 鍝嶅簲鎱細
    - 缂╃煭 `AGENT_CONTEXT_ROUNDS`銆侀檷浣庡伐鍏疯秴鏃躲€佷紭鍖?MCP 宸ュ叿鏈韩鑰楁椂銆?4. 棰戠箒寰幆璋冪敤宸ュ叿锛?   - 闄嶄綆 `AGENT_MAX_ITERATIONS` 涓?`AGENT_TOOL_MAX_CALLS`銆?
 ## 11. 宸茬煡闂涓庢敞鎰忎簨椤?
-- 鐜板湪淇濈暀鐨勮皟璇曡剼鏈负锛?  - `chat`: `node scripts/chatCli.js`
 
 - 涓埆婧愮爜鏂囦欢娉ㄩ噴瀛樺湪涔辩爜锛堢紪鐮佸巻鍙查棶棰橈級锛屼笉褰卞搷杩愯锛屼絾寤鸿缁熶竴涓?UTF-8 閲嶆柊鏁寸悊銆?
 ## 12. 鍚庣画鍙墿灞曟柟鍚?

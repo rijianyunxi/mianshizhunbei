@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "agent-koa",
   "version": "1.0.0",
   "description": "Koa + LangGraph + MCP agent server for smart construction scenarios.",
@@ -6,10 +6,7 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js",
-    "chat": "node scripts/chatCli.js",
-    "mcp:demo": "node src/mcp/demoSmartSiteServer.js",
-    "mcp:test": "node src/mcp/hotSwapTestServer.js"
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",

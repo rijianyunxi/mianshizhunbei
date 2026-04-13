@@ -37,6 +37,8 @@ const mcpServersJsonSchema = z.string().default('[]').transform((raw, ctx) => {
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).optional().default('development'),
   PORT: z.coerce.number().int().positive().default(8787),
+  DB_PROVIDER: z.enum(['sqlite', 'postgres']).default('sqlite'),
+  SQLITE_PATH: z.string().min(1).default('./data/agent.db'),
   OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_BASE_URL: z.string().url().optional(),
   OPENAI_MODEL: z.string().min(1).default('gpt-4.1-mini'),

@@ -6,7 +6,7 @@ import { env } from './config/env.js';
 import { mcpRegistry } from './mcp/mcpRegistry.js';
 import { initCheckpointer } from './persistence/checkpointer.js';
 import { initConversationStore } from './persistence/conversations.js';
-import { closePgPool, pgInfo } from './persistence/pg.js';
+import { closePersistence, storageInfo } from './persistence/storage.js';
 import { createApiRouter } from './routes/index.js';
 import { toolRouter } from './tooling/toolRouter.js';
 
@@ -66,7 +66,7 @@ function registerRoutes(app) {
     env,
     mcpRegistry,
     toolRouter,
-    pgInfo,
+    storageInfo,
   });
 
   app.use(apiRouter.routes());
@@ -106,9 +106,9 @@ async function shutdown(signal) {
   }
 
   try {
-    await closePgPool();
+    await closePersistence();
   } catch (error) {
-    console.error('[agent-server] failed to close PG pool:', error);
+    console.error('[agent-server] failed to close persistence:', error);
   }
 
   if (server) {

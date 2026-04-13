@@ -1,6 +1,7 @@
-﻿import Router from '@koa/router';
+import Router from '@koa/router';
 import { z } from 'zod';
 import { smartConstructionAgent } from '../agent/smartConstructionAgent.js';
+import { clearThreadCheckpoints } from '../persistence/checkpointer.js';
 import { conversationStore } from '../persistence/conversations.js';
 
 const listThreadsSchema = z.object({
@@ -83,6 +84,7 @@ threadsRouter.delete('/agent/threads/:threadId', async (ctx) => {
     return;
   }
 
+  await clearThreadCheckpoints(threadId);
   await conversationStore.deleteConversation(threadId);
   ctx.status = 204;
 });
