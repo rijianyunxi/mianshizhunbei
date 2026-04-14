@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   lang: 'zh-CN',
   title: "song's blog",
-  description: '前端、算法与 AI Agent 学习记录',
+  description: '记录生活，记录学习！',
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
@@ -25,7 +25,6 @@ export default defineConfig({
           text: 'LeetCode Hot100',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/leetcode-hot100/' },
             { text: '01 - 数组与哈希', link: '/posts/leetcode-hot100/01-数组与哈希' },
             { text: '02 - 双指针', link: '/posts/leetcode-hot100/02-双指针' },
             { text: '03 - 滑动窗口', link: '/posts/leetcode-hot100/03-滑动窗口' },
@@ -44,7 +43,6 @@ export default defineConfig({
           text: 'JS 手写实现',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/js-手写实现/' },
             { text: '01 - Promise 完整实现', link: '/posts/js-手写实现/01-Promise完整实现' },
             { text: '02 - 深拷贝完整实现', link: '/posts/js-手写实现/02-深拷贝完整实现' },
             { text: '03 - 继承的六种方式', link: '/posts/js-手写实现/03-继承的六种方式' },
@@ -64,7 +62,6 @@ export default defineConfig({
           text: 'AI Agent',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/ai-agent/' },
             { text: '01 - Koa 后端服务架构', link: '/posts/ai-agent/01-Koa后端服务架构' },
             { text: '02 - React 前端聊天界面实现', link: '/posts/ai-agent/02-React前端-聊天界面实现' },
             { text: '03 - LangGraph + MCP 工具调度设计', link: '/posts/ai-agent/03-LangGraph与MCP工具调度设计' },
@@ -72,10 +69,20 @@ export default defineConfig({
           ]
         },
         {
+          text: 'TypeScript 工程配置',
+          collapsed: true,
+          items: [
+            { text: '01 - tsconfig.json 全配置详解', link: '/posts/typescript-config/01-tsconfig全配置详解' },
+            { text: '02 - tsx / tsup / tsc 工具链对比', link: '/posts/typescript-config/02-tsx-tsup-tsc工具链对比' },
+            { text: '03 - 环境变量与 dotenv', link: '/posts/typescript-config/03-环境变量与dotenv' },
+            { text: '04 - 模块系统与路径别名', link: '/posts/typescript-config/04-模块系统与路径别名' },
+            { text: '05 - OpenAI SDK 类型系统详解', link: '/posts/typescript-config/05-OpenAI-SDK类型系统详解' },
+          ]
+        },
+        {
           text: 'Vue3 迷你实现',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/vue-mini/' },
             { text: '01 - 项目架构总览', link: '/posts/vue-mini/01-vue3-mini-项目架构总览' },
             { text: '02 - 响应式系统 reactive & proxy', link: '/posts/vue-mini/02-vue3-响应式系统-reactive-proxy' },
             { text: '03 - 依赖收集与触发 effect', link: '/posts/vue-mini/03-vue3-依赖收集与触发-effect' },
@@ -87,10 +94,9 @@ export default defineConfig({
           ]
         },
         {
-          text: 'React 迷你实现',
+          text: 'React',
           collapsed: true,
           items: [
-            { text: '系列首页', link: '/posts/react-mini/' },
             { text: '01 - 项目架构总览', link: '/posts/react-mini/01-react-mini-项目架构总览' },
             { text: '02 - JSX 与 ReactElement', link: '/posts/react-mini/02-React-JSX与ReactElement' },
             { text: '03 - Fiber 架构详解', link: '/posts/react-mini/03-React-Fiber架构详解' },
@@ -104,17 +110,14 @@ export default defineConfig({
           items: [
             { text: '前端监控 SDK', link: '/posts/monitor-sdk/' },
             { text: '浏览器 API', link: '/posts/浏览器API/' },
-            { text: 'React 实战', link: '/posts/React实战/' },
-            { text: 'Vue 实战', link: '/posts/Vue实战/' },
             { text: 'Webpack', link: '/posts/webpack/' },
-            { text: '项目亮点与面试', link: '/posts/项目亮点与面试/' },
           ]
         },
       ]
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/' },
+      { icon: 'github', link: 'https://github.com/rijianyunxi' },
     ],
 
     search: {
