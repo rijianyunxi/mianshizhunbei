@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "agent-koa",
   "version": "1.0.0",
   "description": "Koa + LangGraph + MCP agent server for smart construction scenarios.",
